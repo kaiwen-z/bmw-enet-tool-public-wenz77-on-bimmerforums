@@ -110,7 +110,7 @@ def hsfz(src, dst, uds: bytes) -> bytes:
     return struct.pack(">I", len(body)) + b"\x00\x01" + body
 ```
 
-** Capturing and replaying handshake packets:**
+**Capturing and replaying handshake packets:**
 
 ![image](/media/IMG20260303211802.jpg)
 
@@ -206,7 +206,8 @@ pip install -r requirements.txt
 python bmw_dashboard.py
 ```
 
-** OR **
+**OR**
+
 Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged with pyInstaller)
 
 ## Usage
