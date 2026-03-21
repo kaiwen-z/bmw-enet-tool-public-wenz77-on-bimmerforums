@@ -65,29 +65,26 @@ This project provides a **live, real-time dashboard** for monitoring BMW N55 eng
 
 ## 🏗️ Technical Architecture
 
+### TCP packet format:
+PC → Car:  00 00 00 05 00 01 f4 12 22 f3 00      (Read DID F300)
+Car → PC:  00 00 00 05 00 02 f4 12 22 f3 00      (ZGW echo)
+Car → PC:  00 00 00 06 00 01 12 f4 62 f3 00 42   (ECU response: value = 0x42)
+
+PC → Car:  00 00 00 06 00 01 f4 12 2c 03 f3 00   (Define data block by DID F300)
+Car → PC:  00 00 00 06 00 02 f4 12 2c 03 f3 00   (ZGW echo)
+Car → PC:  00 00 00 06 00 01 12 f4 6c 03 f3 00   (ECU response: block defined)
+
+PC → Car:  00 00 00 0a 00 01 f4 12 2c 01 f3 00 44 02 01 02  (Read data block)
+Car → PC:  00 00 00 07 00 02 f4 12 2c 01 f3 00 44            (ZGW echo)
+Car → PC:  00 00 00 06 00 01 12 f4 6c 01 f3 00               (ECU response: sending data)
+
 ### Protocol Stack
-┌─────────────────────────────────────────┐
-│         Tkinter GUI (Dashboard)         │
-├─────────────────────────────────────────┤
-│      HSFZ Protocol Handler              │
-│  (Header: 4-byte length + 2-byte type)  │
-├─────────────────────────────────────────┤
-│    UDS Diagnostic Protocol              │
-│  - 0x2C DynamicDefineDataIdentifier     │
-│  - 0x22 ReadDataByIdentifier            │
-├─────────────────────────────────────────┤
-│      TCP Socket (Port 6801)             │
-├─────────────────────────────────────────┤
-│        BMW ENET Interface               │
-│     (169.254.9.103:6801)                │
-└─────────────────────────────────────────┘
+
+![stack](/media/protocolstack.png)
 
 ### Sensor Data Flow
-ECU (DME 0x12) → HSFZ Frame → UDS Response → Scale Function → Gauge Display
-     │              │              │              │              │
-  Raw Value    0x0001 Type    0x62 Response   × 0.25 RPM     Circular
-  DID 0x4807   Checksum       DID F300       × 0.1 V        Digital
-               Validation     Payload        × 0.0145 PSI   Bar
+
+![flowchart](/media/sensorflowchart.png)
 
             
 ## 🚀 Development Journey
