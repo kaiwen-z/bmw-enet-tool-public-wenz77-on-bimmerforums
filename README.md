@@ -90,16 +90,19 @@ Approach:
 Captured network traffic using Wireshark
 - Analyzed ISTA/D diagnostic software behavior for initial TCP handshake
 - Reverse-engineered HSFZ frame structure
+
 Key Findings:
 - HSFZ uses 6-byte header: 4-byte length + 2-byte message type
 - Type 0x0001 = real ECU data
 - Type 0x0002 = gateway echo (must be ignored)
 - UDS service 0x2C allows dynamic DID definition
 
-** Packet Construction:
-'''python
+**Packet Construction:**
+
+```python
 def hsfz(src, dst, uds: bytes) -> bytes:
     body = bytes([src, dst]) + uds
     return struct.pack(">I", len(body)) + b"\x00\x01" + body
-'''
+```
+
 ![image](/media/IMG20260303211802.jpg)
