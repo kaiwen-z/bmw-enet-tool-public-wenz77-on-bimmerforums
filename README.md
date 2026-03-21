@@ -79,14 +79,12 @@ Car → PC:  00 00 00 07 00 02 f4 12 2c 01 f3 00 44            (ZGW echo)
 Car → PC:  00 00 00 06 00 01 12 f4 6c 01 f3 00               (ECU response: sending data)
 
 ### Protocol Stack
-
 ![stack](/media/protocolstack.png)
-
 ### Sensor Data Flow
-
 ![flowchart](/media/sensorflowchart.png)
-
             
 ## 🚀 Development Journey
 
 ### Iteration 1: Protocol Discovery
+
+![image](/media/IMG20260303211802.jpg)
