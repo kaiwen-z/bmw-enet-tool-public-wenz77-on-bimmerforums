@@ -15,7 +15,6 @@
 - [Features](#features)
 - [Technical Architecture](#technical-architecture)
 - [Development Journey](#development-journey)
-- [Challenges & Solutions](#challenges--solutions)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Supported Sensors](#supported-sensors)
@@ -116,7 +115,7 @@ def hsfz(src, dst, uds: bytes) -> bytes:
 ### Challenge 2: Sensor Mapping
 
 Approach:
-- Scanned ISTA DATEN files for F-chassis sensor definitions
+- Sniff ISTA network messages and map them to sensor definitions
 - Cross-referenced community documentation (Bimmerforums, NCSExpert forums)
 - Validated scale factors against known conditions
 
@@ -125,4 +124,60 @@ Challenges:
 - Needed real-world validation (e.g., battery at rest ≈ 12.5V)
 - Some DIDs returned unexpected data formats
 
+All of the mapping and sensor value decoding was done using wireshark and packet inspection, corrosponding to their live-data view displayed in BMW/ISTA
+
 ![image](/media/IMG20260303182619.jpg)
+
+## Challenge 3: Silent Recovery
+
+SFZ gateway sends echo frames (type 0x0002) that corrupted data parsing. so in the packet parser, I filter message types and ignore echo frames.
+
+Additionally, sometimes the ECU sometimes stops responding after 2-3 seconds, requiring manual reconnect. So I implemented a timeout watchdog with auto reconnect based on the last received message
+
+```python
+def _poll_stall_timeout(self, gen: int):
+    """ECU didn't respond within 500ms — reconnect"""
+    if gen != self._poll_gen:
+        return  # Response arrived late
+    self._evt("ECU stall — reconnecting…", "warn")
+    threading.Thread(target=_do_reconnect, daemon=True).start()
+```
+
+Also ran into some issues with the socket thread and GUI thread competing for resource accesses, so there is a drain queue implemented that clears itself every 10ms.
+
+```python
+self._pkt_queue = queue.Queue()
+# Worker thread puts messages
+self._pkt_queue.put(("sensor", uds[3:], snapshot))
+# GUI thread drains queue
+self.after(10, self._drain_queue)
+```
+
+## Challenge 4: Optimizations and Logging
+
+We have:
+- Threaded socket handling - Network I/O separate from GUI
+- Queue-based communication - Thread-safe data passing
+- Polling state machine - Define → Read → Clear cycle
+- Watchdog timer - Auto-recovery from ECU stalls
+
+And logging capabilities:
+- CSV logging with millisecond timestamps
+- Multiprocess log viewer (doesn't block main dashboard)
+- Shared memory for cursor synchronization
+- Multiple visualization modes (Raw, Min-Max %, Z-Score, Dual-Y)
+
+```python
+# Dashboard → Viewer sync via shared memory
+self._replay_shared_idx = multiprocessing.Value('i', 0)
+p = multiprocessing.Process(
+    target=_launch_log_viewer_synced,
+    args=(path, self._replay_shared_idx)
+)
+```
+
+## Challenge 5: GUI iterations
+
+The GUI went through several iterations before settling for a hybrid bar graph, digital display, and circular gauge UI. Additionally Tkinter's native scrollbar for the sensor dropdown ignored custom colour settings on windows, so the scrollbar is actually a custom `tk.Canvas` object.
+
+![image](/media/IMG20260304003506.jpg)
