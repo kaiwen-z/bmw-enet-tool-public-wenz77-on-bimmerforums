@@ -8,7 +8,7 @@
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
 - [Demo](#demo)
 - [Overview](#overview)
@@ -22,7 +22,7 @@
 
 ---
 
-## 🎬 Demo
+## Demo
 
 ### Live Dashboard with Log Replay Feature
 
@@ -34,7 +34,7 @@
 
 ---
 
-## 📋 Overview
+## Overview
 
 This project provides a **live, real-time dashboard** for monitoring BMW N55 engine sensors through the ENET (Ethernet) diagnostic interface. Built from scratch after extensive reverse-engineering of BMW's HSFZ/UDS protocol, it delivers professional-grade telemetry without expensive commercial tools.
 
@@ -50,7 +50,7 @@ The issue is determined to be (drumroll please): Pressure sag on the low pressur
 ![image](/media/fuel pressure drop.PNG)
 ---
 
-## ✨ Features
+## Features
 
 - **🔌 Live Sensor Monitoring** - Real-time data from 11 engine parameters. Disable sensors by clicking on their gauge or the sensor list dropdown
 - **💾 CSV Logging** - Timestamped data logging for later analysis. Files are created in the same directory as the livedashboard runs
@@ -64,7 +64,7 @@ The issue is determined to be (drumroll please): Pressure sag on the low pressur
 
 ---
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 ### TCP packet format:
 
@@ -87,7 +87,7 @@ Car → PC:  00 00 00 06 00 01 12 f4 6c 01 f3 00               (ECU response: se
 ### Sensor Data Flow
 ![flowchart](/media/sensorflowchart1.png)
             
-## 🚀 Development Journey
+## Development Journey
 
 ### Challenge 1: Protocol Discovery
 Approach:
@@ -267,13 +267,13 @@ Intake Pressure — DID: 0x580B | ECU: 0x12 | Range: 0-15 | Unit: PSI
 Valvetronic Angle — DID: 0x58A2 | ECU: 0x12 | Range: 0-60 | Unit: deg
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Areas needing help:
 - Implement custom DID definitions via GUI
 - Create mobile companion app
 - Add more sensors (transmission, chassis, etc.)
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
