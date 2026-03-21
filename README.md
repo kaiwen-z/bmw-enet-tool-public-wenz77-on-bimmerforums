@@ -47,7 +47,8 @@ This project provides a **live, real-time dashboard** for monitoring BMW N55 eng
 
 The issue is determined to be (drumroll please): Pressure sag on the low pressure fuel pump due to voltage sag. When the engine starts up in cold weather, the battery voltage sags down to 11 volts. At the same time the engine high pressure fuel pump is pulling fuel away from the low pressure supply, and the voltage sag is reducing the low pressure supply by reducing the power to the low pressure fuel pump. As a result, we get this odd startup stumble as the engine is starved for fuel:
 
-![image](/media/fuel pressure drop.PNG)
+![image](/media/fuelpressuredrop.PNG)
+
 ---
 
 ## Features
