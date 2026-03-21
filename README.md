@@ -88,7 +88,7 @@ Car → PC:  00 00 00 06 00 01 12 f4 6c 01 f3 00               (ECU response: se
             
 ## 🚀 Development Journey
 
-### Iteration 1: Protocol Discovery
+### Challenge 1: Protocol Discovery
 Approach:
 Captured network traffic using Wireshark
 - Analyzed ISTA/D diagnostic software behavior for initial TCP handshake
@@ -108,4 +108,21 @@ def hsfz(src, dst, uds: bytes) -> bytes:
     return struct.pack(">I", len(body)) + b"\x00\x01" + body
 ```
 
+** Capturing and replaying handshake packets:**
+
 ![image](/media/IMG20260303211802.jpg)
+
+
+### Challenge 2: Sensor Mapping
+
+Approach:
+- Scanned ISTA DATEN files for F-chassis sensor definitions
+- Cross-referenced community documentation (Bimmerforums, NCSExpert forums)
+- Validated scale factors against known conditions
+
+Challenges:
+- Many scale factors were estimates from community docs
+- Needed real-world validation (e.g., battery at rest ≈ 12.5V)
+- Some DIDs returned unexpected data formats
+
+![image](/media/IMG20260303182619.jpg)
