@@ -37,7 +37,7 @@ This repository contains the source code and documentation of the development pr
 
 ### Interactive Log Viewer
 
-![Log Viewer](/media/bmwenetlogger.PNG.png)
+![Log Viewer](/media/bmwenetlogger.PNG)
 
 ---
 
