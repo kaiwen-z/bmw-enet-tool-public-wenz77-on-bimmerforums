@@ -1,0 +1,64 @@
+packet 2 is the define frame
+value response is read packet response
+
+battery voltage sensor:
+define frame hex: 0000 0000000a0001f4122c01f30058150101
+value response hex: 0000 00000006000112f462f30093
+known value: 13.5v
+
+engine RPM sensor:
+define frame hex 0000 0000000a0001f4122c01f30048070102
+value response hex: 0000 00000007000112f462f3000d28
+known value: 800rpm
+
+low pressure fuel pump pressure sensor:
+define frame hex: 0000 0000000a0001f4122c01f30058f30102
+value response hex: 0000 00000007000112f462f300177f
+known value: 600kPa
+
+rail pressure sensor:
+define frame hex: 0000 0000000a0001f4122c01f30058f00102
+value response hex: 0000 00000007000112f462f30027f6
+known value: 5.07Mpa
+
+coolant temp sensor:
+define frame hex: 0000 0000000a0001f4122c01f30043000101
+value response hex: 0000 00000006000112f462f30086
+known value: 55c
+
+oil pressure sensor:
+define frame hex: 0000 Data: 0000000a0001f4122c01f300586f0102
+value response hex: 0000 Data: 00000007000112f462f3000aac
+known value: 2744hPa
+
+sensors to add:
+engine oil temp
+charge pressure
+intake vac
+throttle angle
+valvetronicactuatorangle
+
+engine oil temp sensor:
+define frame hex: 0000 0000000a0001f4122c01f30044020102
+value response hex: 0000 00000007000112f462f30000c4
+known value:100.50c
+
+boost pressure sensor:
+define frame hex: 0000 0000000a0001f4122c01f30058dd0102
+value response hex: 0000 00000007000112f462f30032b9
+known value: 1014.45 hPa -> convert to psi (multiply by 0.0145037738)
+
+throttle angle sensor:
+define frame hex: 0000 0000000a0001f4122c01f30046000102
+value response hex: 0000 00000007000112f462f3000070
+known value: 2.73%
+
+intake vaccume sensor:
+define frame hex: 0000 Data: 0000000a0001f4122c01f300580b0102
+value response hex: 0000 Data: 00000007000112f462f30060b0
+known value:964.84 hPa -> convert to psi (multiply by 0.0145037738)
+
+valvetronic eccentric shaft angle sensor:
+define frame hex: 0000 0000000a0001f4122c01f30058a20102
+value response hex: 0000 00000007000112f462f30000fd
+known value: 25.30 degrees

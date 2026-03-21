@@ -1,0 +1,307 @@
+No.     Time           Source                Destination           Protocol Length Info
+   1500 131.516859800  169.254.3.169         169.254.9.103         TCP      65     54503 → 6801 [PSH, ACK] Seq=3761 Ack=9117 Win=65268 Len=11
+
+Frame 1500: Packet, 65 bytes on wire (520 bits), 65 bytes captured (520 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3761, Ack: 9117, Len: 11
+Data (11 bytes)
+
+0000  00 00 00 05 00 01 f4 12 22 f3 00                  ........"..
+    Data: 000000050001f41222f300
+    [Length: 11]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1501 131.517262100  169.254.9.103         169.254.3.169         TCP      65     6801 → 54503 [PSH, ACK] Seq=9117 Ack=3772 Win=4989 Len=11
+
+Frame 1501: Packet, 65 bytes on wire (520 bits), 65 bytes captured (520 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9117, Ack: 3772, Len: 11
+Data (11 bytes)
+
+0000  00 00 00 05 00 02 f4 12 22 f3 00                  ........"..
+    Data: 000000050002f41222f300
+    [Length: 11]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1502 131.546139200  169.254.9.103         169.254.3.169         TCP      67     6801 → 54503 [PSH, ACK] Seq=9128 Ack=3772 Win=4989 Len=13
+
+Frame 1502: Packet, 67 bytes on wire (536 bits), 67 bytes captured (536 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9128, Ack: 3772, Len: 13
+Data (13 bytes)
+
+0000  00 00 00 07 00 01 12 f4 62 f3 00 00 00            ........b....
+    Data: 00000007000112f462f3000000
+    [Length: 13]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1503 131.546254000  169.254.3.169         169.254.9.103         TCP      54     54503 → 6801 [ACK] Seq=3772 Ack=9141 Win=65244 Len=0
+
+Frame 1503: Packet, 54 bytes on wire (432 bits), 54 bytes captured (432 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3772, Ack: 9141, Len: 0
+
+No.     Time           Source                Destination           Protocol Length Info
+   1504 131.554539300  169.254.3.169         169.254.9.103         TCP      66     54503 → 6801 [PSH, ACK] Seq=3772 Ack=9141 Win=65244 Len=12
+
+Frame 1504: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3772, Ack: 9141, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 f4 12 2c 03 f3 00               ........,...
+    Data: 000000060001f4122c03f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1505 131.555126200  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9141 Ack=3784 Win=4977 Len=12
+
+Frame 1505: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9141, Ack: 3784, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 02 f4 12 2c 03 f3 00               ........,...
+    Data: 000000060002f4122c03f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1506 131.586245500  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9153 Ack=3784 Win=4977 Len=12
+
+Frame 1506: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9153, Ack: 3784, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 12 f4 6c 03 f3 00               ........l...
+    Data: 00000006000112f46c03f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1507 131.586360900  169.254.3.169         169.254.9.103         TCP      54     54503 → 6801 [ACK] Seq=3784 Ack=9165 Win=65220 Len=0
+
+Frame 1507: Packet, 54 bytes on wire (432 bits), 54 bytes captured (432 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3784, Ack: 9165, Len: 0
+
+No.     Time           Source                Destination           Protocol Length Info
+   1508 131.587374000  169.254.3.169         169.254.9.103         TCP      70     54503 → 6801 [PSH, ACK] Seq=3784 Ack=9165 Win=65220 Len=16
+
+Frame 1508: Packet, 70 bytes on wire (560 bits), 70 bytes captured (560 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3784, Ack: 9165, Len: 16
+Data (16 bytes)
+
+0000  00 00 00 0a 00 01 f4 12 2c 01 f3 00 43 00 01 01   ........,...C...
+    Data: 0000000a0001f4122c01f30043000101
+    [Length: 16]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1509 131.587914600  169.254.9.103         169.254.3.169         TCP      67     6801 → 54503 [PSH, ACK] Seq=9165 Ack=3800 Win=4961 Len=13
+
+Frame 1509: Packet, 67 bytes on wire (536 bits), 67 bytes captured (536 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9165, Ack: 3800, Len: 13
+Data (13 bytes)
+
+0000  00 00 00 07 00 02 f4 12 2c 01 f3 00 43            ........,...C
+    Data: 000000070002f4122c01f30043
+    [Length: 13]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1510 131.623969100  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9178 Ack=3800 Win=4961 Len=12
+
+Frame 1510: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9178, Ack: 3800, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 12 f4 6c 01 f3 00               ........l...
+    Data: 00000006000112f46c01f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1511 131.624074500  169.254.3.169         169.254.9.103         TCP      54     54503 → 6801 [ACK] Seq=3800 Ack=9190 Win=65195 Len=0
+
+Frame 1511: Packet, 54 bytes on wire (432 bits), 54 bytes captured (432 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3800, Ack: 9190, Len: 0
+
+No.     Time           Source                Destination           Protocol Length Info
+   1512 131.624877200  169.254.3.169         169.254.9.103         TCP      65     54503 → 6801 [PSH, ACK] Seq=3800 Ack=9190 Win=65195 Len=11
+
+Frame 1512: Packet, 65 bytes on wire (520 bits), 65 bytes captured (520 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3800, Ack: 9190, Len: 11
+Data (11 bytes)
+
+0000  00 00 00 05 00 01 f4 12 22 f3 00                  ........"..
+    Data: 000000050001f41222f300
+    [Length: 11]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1513 131.625261300  169.254.9.103         169.254.3.169         TCP      65     6801 → 54503 [PSH, ACK] Seq=9190 Ack=3811 Win=4950 Len=11
+
+Frame 1513: Packet, 65 bytes on wire (520 bits), 65 bytes captured (520 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9190, Ack: 3811, Len: 11
+Data (11 bytes)
+
+0000  00 00 00 05 00 02 f4 12 22 f3 00                  ........"..
+    Data: 000000050002f41222f300
+    [Length: 11]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1514 131.657838100  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9201 Ack=3811 Win=4950 Len=12
+
+Frame 1514: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9201, Ack: 3811, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 12 f4 62 f3 00 42               ........b..B
+    Data: 00000006000112f462f30042
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1515 131.658106700  169.254.3.169         169.254.9.103         TCP      54     54503 → 6801 [ACK] Seq=3811 Ack=9213 Win=65172 Len=0
+
+Frame 1515: Packet, 54 bytes on wire (432 bits), 54 bytes captured (432 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3811, Ack: 9213, Len: 0
+
+No.     Time           Source                Destination           Protocol Length Info
+   1516 131.682807700  169.254.3.169         169.254.9.103         TCP      66     54503 → 6801 [PSH, ACK] Seq=3811 Ack=9213 Win=65172 Len=12
+
+Frame 1516: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3811, Ack: 9213, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 f4 12 2c 03 f3 00               ........,...
+    Data: 000000060001f4122c03f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1517 131.687032600  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9213 Ack=3823 Win=4938 Len=12
+
+Frame 1517: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9213, Ack: 3823, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 02 f4 12 2c 03 f3 00               ........,...
+    Data: 000000060002f4122c03f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1518 131.715998100  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9225 Ack=3823 Win=4938 Len=12
+
+Frame 1518: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9225, Ack: 3823, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 12 f4 6c 03 f3 00               ........l...
+    Data: 00000006000112f46c03f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1519 131.716104400  169.254.3.169         169.254.9.103         TCP      54     54503 → 6801 [ACK] Seq=3823 Ack=9237 Win=65148 Len=0
+
+Frame 1519: Packet, 54 bytes on wire (432 bits), 54 bytes captured (432 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3823, Ack: 9237, Len: 0
+
+No.     Time           Source                Destination           Protocol Length Info
+   1520 131.717152900  169.254.3.169         169.254.9.103         TCP      70     54503 → 6801 [PSH, ACK] Seq=3823 Ack=9237 Win=65148 Len=16
+
+Frame 1520: Packet, 70 bytes on wire (560 bits), 70 bytes captured (560 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3823, Ack: 9237, Len: 16
+Data (16 bytes)
+
+0000  00 00 00 0a 00 01 f4 12 2c 01 f3 00 44 02 01 02   ........,...D...
+    Data: 0000000a0001f4122c01f30044020102
+    [Length: 16]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1521 131.717594400  169.254.9.103         169.254.3.169         TCP      67     6801 → 54503 [PSH, ACK] Seq=9237 Ack=3839 Win=4922 Len=13
+
+Frame 1521: Packet, 67 bytes on wire (536 bits), 67 bytes captured (536 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9237, Ack: 3839, Len: 13
+Data (13 bytes)
+
+0000  00 00 00 07 00 02 f4 12 2c 01 f3 00 44            ........,...D
+    Data: 000000070002f4122c01f30044
+    [Length: 13]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1522 131.745986900  169.254.9.103         169.254.3.169         TCP      66     6801 → 54503 [PSH, ACK] Seq=9250 Ack=3839 Win=4922 Len=12
+
+Frame 1522: Packet, 66 bytes on wire (528 bits), 66 bytes captured (528 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9250, Ack: 3839, Len: 12
+Data (12 bytes)
+
+0000  00 00 00 06 00 01 12 f4 6c 01 f3 00               ........l...
+    Data: 00000006000112f46c01f300
+    [Length: 12]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1523 131.746089000  169.254.3.169         169.254.9.103         TCP      54     54503 → 6801 [ACK] Seq=3839 Ack=9262 Win=65123 Len=0
+
+Frame 1523: Packet, 54 bytes on wire (432 bits), 54 bytes captured (432 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3839, Ack: 9262, Len: 0
+
+No.     Time           Source                Destination           Protocol Length Info
+   1524 131.746523600  169.254.3.169         169.254.9.103         TCP      65     54503 → 6801 [PSH, ACK] Seq=3839 Ack=9262 Win=65123 Len=11
+
+Frame 1524: Packet, 65 bytes on wire (520 bits), 65 bytes captured (520 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b), Dst: Lear_0e:8a:9f (00:1a:37:0e:8a:9f)
+Internet Protocol Version 4, Src: 169.254.3.169, Dst: 169.254.9.103
+Transmission Control Protocol, Src Port: 54503, Dst Port: 6801, Seq: 3839, Ack: 9262, Len: 11
+Data (11 bytes)
+
+0000  00 00 00 05 00 01 f4 12 22 f3 00                  ........"..
+    Data: 000000050001f41222f300
+    [Length: 11]
+
+No.     Time           Source                Destination           Protocol Length Info
+   1525 131.747074800  169.254.9.103         169.254.3.169         TCP      65     6801 → 54503 [PSH, ACK] Seq=9262 Ack=3850 Win=4911 Len=11
+
+Frame 1525: Packet, 65 bytes on wire (520 bits), 65 bytes captured (520 bits) on interface \Device\NPF_{374B45E0-29D6-4965-8BE7-26C8C6DDD2B4}, id 8
+Ethernet II, Src: Lear_0e:8a:9f (00:1a:37:0e:8a:9f), Dst: CompalInform_08:6c:7b (08:8f:c3:08:6c:7b)
+Internet Protocol Version 4, Src: 169.254.9.103, Dst: 169.254.3.169
+Transmission Control Protocol, Src Port: 6801, Dst Port: 54503, Seq: 9262, Ack: 3850, Len: 11
+Data (11 bytes)
+
+0000  00 00 00 05 00 02 f4 12 22 f3 00                  ........"..
+    Data: 000000050002f41222f300
+    [Length: 11]
