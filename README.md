@@ -46,6 +46,10 @@ This project provides a **live, real-time dashboard** for monitoring BMW N55 eng
 
 **Here is the cold start stumble:**
 [![Watch the video](https://img.youtube.com/vi/QyVEl4P64RY/maxresdefault.jpg)](https://youtu.be/QyVEl4P64RY)
+
+The issue is determined to be (drumroll please): Pressure sag on the low pressure fuel pump due to voltage sag. When the engine starts up in cold weather, the battery voltage sags down to 11 volts. At the same time the engine high pressure fuel pump is pulling fuel away from the low pressure supply, and the voltage sag is reducing the low pressure supply by reducing the power to the low pressure fuel pump. As a result, we get this odd startup stumble as the engine is starved for fuel:
+
+![image](/media/fuel pressure drop.PNG)
 ---
 
 ## ✨ Features
@@ -181,3 +185,80 @@ p = multiprocessing.Process(
 The GUI went through several iterations before settling for a hybrid bar graph, digital display, and circular gauge UI. Additionally Tkinter's native scrollbar for the sensor dropdown ignored custom colour settings on windows, so the scrollbar is actually a custom `tk.Canvas` object.
 
 ![image](/media/IMG20260304003506.jpg)
+
+
+## Installation:
+
+**Prerequisites**
+- Python 3.8+
+- BMW ENET cable (or compatible OBD-to-Ethernet adapter)
+- Windows/Linux (macOS untested)
+
+```bash
+pip install numpy pandas matplotlib tkinter
+```
+
+Then clone the repository, install dependencies and run the python file
+
+```bash
+git clone https://github.com/kaiwen-z/bmw-enet-tool-public-wenz77-on-bimmerforums.git
+cd bmw-enet-tool-public-wenz77-on-bimmerforums/sourcecode
+pip install -r requirements.txt
+python bmw_dashboard.py
+```
+
+** OR **
+Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged with pyInstaller)
+
+## Usage:
+
+**Quickstart:**
+
+1. Connect ENET cable to BMW OBD port and ethernet port
+2. Ensure the connection shows up in device manager
+3. Open the bmw_dashboard program and wait on the main dashboard page
+4. Click the auto-discovery tool for the IP. The port should be already correct for all N55 engines.
+5. Click connect! When the connection is successful, your vin will show up in the top status bar
+6. Click start polling to begin reading sensors
+
+![image](/media/dashboard.PNG)
+
+**Controls guide**
+
+1. Connection panel
+- Enter IP/port or use auto-discovery (🔍 button)
+- Click CONNECT to establish TCP connection
+- VIN automatically read on connect
+
+2. Polling Controls
+- START POLLING begins sensor reads
+- Average delay shown in header (target: <50ms)
+- Click sensor rows to enable/disable individual gauges
+
+3. Logging
+- START LOGGING creates timestamped CSV
+- Logs saved to script directory
+- VIEW LOG opens interactive plotter
+
+4. Replay Mode
+- REPLAY loads existing log
+- Timeline bar appears at bottom
+- Use ⏮ ▶ ⏭ controls or drag slider
+- Spacebar toggles play/pause
+
+5. Log Viewer
+- Click sensor rows to show/hide lines
+- Scroll wheel to zoom in/out
+- Click-drag to pan left/right
+- Bottom slider for quick navigation
+- Mode buttons: Raw | Min-Max % | Z-Score | Dual Y
+
+**📊 Supported Sensors**
+
+
+## Contribution:
+
+Contributions welcome! Areas needing help:
+- Implement custom DID definitions via GUI
+- Create mobile companion app
+- Add more sensors (transmission, chassis, etc.)
