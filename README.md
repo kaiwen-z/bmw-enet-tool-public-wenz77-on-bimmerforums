@@ -226,32 +226,32 @@ Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged w
 **Controls guide**
 
 1. Connection panel
-- Enter IP/port or use auto-discovery (🔍 button)
-- Click CONNECT to establish TCP connection
-- VIN automatically read on connect
+    - Enter IP/port or use auto-discovery (🔍 button)
+    - Click CONNECT to establish TCP connection
+    - VIN automatically read on connect
 
 2. Polling Controls
-- START POLLING begins sensor reads
-- Average delay shown in header (target: <50ms)
-- Click sensor rows to enable/disable individual gauges
+    - START POLLING begins sensor reads
+    - Average delay shown in header (target: <50ms)
+    - Click sensor rows to enable/disable individual gauges
 
 3. Logging
-- START LOGGING creates timestamped CSV
-- Logs saved to script directory
-- VIEW LOG opens interactive plotter
+    - START LOGGING creates timestamped CSV
+    - Logs saved to script directory
+    - VIEW LOG opens interactive plotter
 
 4. Replay Mode
-- REPLAY loads existing log
-- Timeline bar appears at bottom
-- Use ⏮ ▶ ⏭ controls or drag slider
-- Spacebar toggles play/pause
+    - REPLAY loads existing log
+    - Timeline bar appears at bottom
+    - Use ⏮ ▶ ⏭ controls or drag slider
+    - Spacebar toggles play/pause
 
 5. Log Viewer
-- Click sensor rows to show/hide lines
-- Scroll wheel to zoom in/out
-- Click-drag to pan left/right
-- Bottom slider for quick navigation
-- Mode buttons: Raw | Min-Max % | Z-Score | Dual Y
+    - Click sensor rows to show/hide lines
+    - Scroll wheel to zoom in/out
+    - Click-drag to pan left/right
+    - Bottom slider for quick navigation
+    - Mode buttons: Raw | Min-Max % | Z-Score | Dual Y
 
 **📊 Supported Sensors**
 
