@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-green.svg)]()
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Real-time engine sensor monitoring for BMW N55 engines via ENET interface**
 
@@ -17,8 +17,6 @@
 - [Development Journey](#development-journey)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Supported Sensors](#supported-sensors)
-- [Log Viewer](#log-viewer)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -54,7 +52,7 @@ The issue is determined to be (drumroll please): Pressure sag on the low pressur
 
 ## ✨ Features
 
-- **🔌 Live Sensor Monitoring** - Real-time data from 11+ engine parameters. Disable sensors by clicking on their gauge or the sensor list dropdown
+- **🔌 Live Sensor Monitoring** - Real-time data from 11 engine parameters. Disable sensors by clicking on their gauge or the sensor list dropdown
 - **💾 CSV Logging** - Timestamped data logging for later analysis. Files are created in the same directory as the livedashboard runs
 - **🔄 Log Replay** - Replay recorded sessions with synchronized cursor. ENET will disconnect when replay function is active
 - **📈 Interactive Plotter** - Advanced time-series visualization with zoom/pan to help you see the relationship between sensors. Activate / deactivate plotting of sensor data by clicking on their coloured box in the legend.
@@ -187,7 +185,7 @@ The GUI went through several iterations before settling for a hybrid bar graph, 
 ![image](/media/IMG20260304003506.jpg)
 
 
-## Installation:
+## Installation
 
 **Prerequisites**
 - Python 3.8+
@@ -210,7 +208,7 @@ python bmw_dashboard.py
 ** OR **
 Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged with pyInstaller)
 
-## Usage:
+## Usage
 
 **Quickstart:**
 
@@ -255,10 +253,27 @@ Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged w
 
 **📊 Supported Sensors**
 
+```text
+Engine RPM — DID: 0x4807 | ECU: 0x12 | Range: 0-8000 | Unit: RPM
+Battery Voltage — DID: 0x5815 | ECU: 0x12 | Range: 9-16 | Unit: V
+LP Fuel Pressure — DID: 0x58F3 | ECU: 0x12 | Range: 0-145 | Unit: PSI
+HP Rail Pressure — DID: 0x58F0 | ECU: 0x12 | Range: 0-2900 | Unit: PSI
+Coolant Temp — DID: 0x4300 | ECU: 0x12 | Range: 0-130 | Unit: °C
+Oil Pressure — DID: 0x586F | ECU: 0x12 | Range: 0-90 | Unit: PSI
+Engine Oil Temp — DID: 0x4402 | ECU: 0x12 | Range: 0-150 | Unit: °C
+Boost Pressure — DID: 0x58DD | ECU: 0x12 | Range: 0-30 | Unit: PSI
+Throttle Angle — DID: 0x4600 | ECU: 0x12 | Range: 0-100 | Unit: %
+Intake Pressure — DID: 0x580B | ECU: 0x12 | Range: 0-15 | Unit: PSI
+Valvetronic Angle — DID: 0x58A2 | ECU: 0x12 | Range: 0-60 | Unit: deg
+```
 
-## Contribution:
+## 🤝 Contributing
 
 Contributions welcome! Areas needing help:
 - Implement custom DID definitions via GUI
 - Create mobile companion app
 - Add more sensors (transmission, chassis, etc.)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
