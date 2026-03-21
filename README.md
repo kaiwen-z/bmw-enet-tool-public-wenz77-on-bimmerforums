@@ -66,23 +66,20 @@ This project provides a **live, real-time dashboard** for monitoring BMW N55 eng
 ## 🏗️ Technical Architecture
 
 ### TCP packet format:
+
+```text
 PC → Car:  00 00 00 05 00 01 f4 12 22 f3 00      (Read DID F300)
-
 Car → PC:  00 00 00 05 00 02 f4 12 22 f3 00      (ZGW echo)
-
 Car → PC:  00 00 00 06 00 01 12 f4 62 f3 00 42   (ECU response: value = 0x42)
 
 PC → Car:  00 00 00 06 00 01 f4 12 2c 03 f3 00   (Define data block by DID F300)
-
 Car → PC:  00 00 00 06 00 02 f4 12 2c 03 f3 00   (ZGW echo)
-
 Car → PC:  00 00 00 06 00 01 12 f4 6c 03 f3 00   (ECU response: block defined)
 
 PC → Car:  00 00 00 0a 00 01 f4 12 2c 01 f3 00 44 02 01 02  (Read data block)
-
 Car → PC:  00 00 00 07 00 02 f4 12 2c 01 f3 00 44            (ZGW echo)
-
 Car → PC:  00 00 00 06 00 01 12 f4 6c 01 f3 00               (ECU response: sending data)
+```
 
 ### Protocol Stack
 ![stack](/media/protocolstack1.png)
