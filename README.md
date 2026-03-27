@@ -85,8 +85,7 @@ Car → PC:  00 00 00 06 00 01 12 f4 6c 01 f3 00               (ECU response: se
 
 ### Protocol Stack
 ![stack](/media/protocolstack1.png)
-### Sensor Data Flow
-![flowchart](/media/sensorflowchart1.png)
+
             
 ## Development Journey
 
