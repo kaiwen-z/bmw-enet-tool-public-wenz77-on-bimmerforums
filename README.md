@@ -132,7 +132,7 @@ All of the mapping and sensor value decoding was done using wireshark and packet
 
 ## Challenge 3: Silent Recovery
 
-SFZ gateway sends echo frames (type 0x0002) that corrupted data parsing. so in the packet parser, I filter message types and ignore echo frames.
+HSFZ gateway sends echo frames (type 0x0002) that corrupted data parsing. so in the packet parser, I filter message types and ignore echo frames.
 
 Additionally, sometimes the ECU sometimes stops responding after 2-3 seconds, requiring manual reconnect. So I implemented a timeout watchdog with auto reconnect based on the last received message
 
