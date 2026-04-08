@@ -24,7 +24,7 @@ excluded module named _frozen_importlib - imported by importlib (optional), impo
 missing module named pep517 - imported by importlib.metadata (delayed)
 missing module named urllib.urlopen - imported by urllib (delayed, optional), lxml.html (delayed, optional)
 missing module named urllib.urlencode - imported by urllib (delayed, optional), lxml.html (delayed, optional)
-missing module named posix - imported by os (conditional, optional), importlib._bootstrap_external (conditional), shutil (conditional)
+missing module named posix - imported by shutil (conditional), importlib._bootstrap_external (conditional), os (conditional, optional)
 missing module named resource - imported by posix (top-level), fsspec.asyn (conditional, optional)
 missing module named 'org.python' - imported by copy (optional), xml.sax (delayed, conditional)
 missing module named _posixshmem - imported by multiprocessing.resource_tracker (conditional), multiprocessing.shared_memory (conditional)

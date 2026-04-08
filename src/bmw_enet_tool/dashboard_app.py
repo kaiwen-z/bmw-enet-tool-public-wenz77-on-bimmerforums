@@ -17,7 +17,7 @@ from .paths import application_base_dir
 from .protocol import DYN_H, DYN_L, TESTER, hsfz, parse_hsfz
 from .sensors import (
     SENSORS, get_sensors, get_sensor_by_id, sensor_id_at, index_of,
-    add_sensor, update_sensor, delete_sensor,
+    add_sensor, update_sensor, delete_sensor, _resolve_sensor_json_path,
 )
 from .ui_theme import *  # noqa: F403
 from .gauge_canvas import GaugeHost
@@ -752,11 +752,23 @@ class Dashboard(tk.Tk):
         self.after_idle(self._gauge_host.fit_grid_layout)
 
     def _default_layout_profile(self):
-        default_path = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "default.json")
-        )
+        default_dir = os.path.dirname(_resolve_sensor_json_path())
+        default_path = os.path.join(default_dir, "default.profile")
         profile = load_profile(default_path)
-        return profile if profile is not None else DEFAULT_GAUGE_PROFILE
+        if profile is not None:
+            return profile
+
+        # First-run seed: write a user-editable default profile if none exists.
+        seeded = {
+            "version": DEFAULT_GAUGE_PROFILE.get("version", 2),
+            "gauges": [dict(g) for g in DEFAULT_GAUGE_PROFILE.get("gauges", [])],
+        }
+        if not os.path.exists(default_path):
+            try:
+                save_profile(seeded, default_path)
+            except Exception:
+                pass
+        return seeded
 
     def _set_canvas_editing_enabled(self, enabled: bool):
         self._gauge_host.set_editing_enabled(enabled)
