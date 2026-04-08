@@ -21,6 +21,9 @@ import sys, os
 import numpy as np
 import pandas as pd
 import matplotlib
+
+# TkAgg only: keeps PyInstaller builds from dragging in Qt/GTK backends (~tens of MB).
+matplotlib.use("TkAgg")
 matplotlib.rcParams["toolbar"] = "None"
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
