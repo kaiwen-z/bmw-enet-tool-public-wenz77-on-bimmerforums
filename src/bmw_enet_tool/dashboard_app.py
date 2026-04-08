@@ -510,9 +510,15 @@ class Dashboard(tk.Tk):
 
     def _rebuild_poll_queue(self):
         self._poll_queue = []
-        for s in get_sensors():
-            sid = s["sensor_id"]
+        # Only poll sensors that are actually drawn on the gauge canvas.
+        # Not drawn == effectively disabled (saves ENET bandwidth).
+        for sid in list(getattr(self, "_gauges", {}).keys()):
+            s = get_sensor_by_id(sid)
+            if s is None:
+                continue
             idx = index_of(sid)
+            if idx < 0 or idx >= len(SENSORS):
+                continue
             scale_fn = SENSORS[idx][4]
             self._poll_queue.append((s["ecu"], s["did"], s["size"], scale_fn, sid))
 
@@ -575,7 +581,14 @@ class Dashboard(tk.Tk):
         s = get_sensor_by_id(sensor_id)
         if s is None:
             return
-        w = self._gauges.get(sensor_id)
+        gauges = getattr(self, "_gauges", {})
+        if sensor_id not in gauges:
+            # Not on canvas => treated as disabled regardless of toggle state.
+            self._disabled_gauges.add(sensor_id)
+            self._update_sensor_row_style(sensor_id)
+            self._evt(f"{s['label']}: add a gauge tile to enable polling", "info")
+            return
+        w = gauges.get(sensor_id)
         if sensor_id in self._disabled_gauges:
             self._disabled_gauges.discard(sensor_id)
             if w is not None:
@@ -594,7 +607,8 @@ class Dashboard(tk.Tk):
         if not row:
             return
         r, l1, l2 = row
-        if sensor_id in self._disabled_gauges:
+        gauges = getattr(self, "_gauges", {})
+        if (sensor_id not in gauges) or (sensor_id in self._disabled_gauges):
             r.configure(bg=DISABLED_ROW_BG)
             l1.configure(bg=DISABLED_ROW_BG, fg=DISABLED_ROW_FG)
             l2.configure(bg=DISABLED_ROW_BG, fg=DISABLED_ROW_FG)
@@ -750,6 +764,9 @@ class Dashboard(tk.Tk):
             if sid in self._disabled_gauges:
                 tile.gauge.set_active(False)
         self.after_idle(self._gauge_host.fit_grid_layout)
+        self._rebuild_poll_queue()
+        for sid in get_sensors():
+            self._update_sensor_row_style(sid["sensor_id"])
 
     def _default_layout_profile(self):
         default_dir = os.path.dirname(_resolve_sensor_json_path())
@@ -803,6 +820,8 @@ class Dashboard(tk.Tk):
         self._gauge_host.remove_tile(sensor_id)
         s = get_sensor_by_id(sensor_id)
         self._evt(f"Removed {s['label'] if s else sensor_id} gauge", "warn")
+        self._rebuild_poll_queue()
+        self._update_sensor_row_style(sensor_id)
 
     def _add_gauge_dialog(self):
         if self._replay_state != "idle":
@@ -824,12 +843,18 @@ class Dashboard(tk.Tk):
                 tile.gauge.set_active(False)
             s = get_sensor_by_id(sid)
             self._evt(f"Added {s['label'] if s else sid} ({kind})", "ok")
+            self._rebuild_poll_queue()
+            self._update_sensor_row_style(sid)
 
     def _save_gauge_profile(self):
         from tkinter import filedialog
+        start_dir = application_base_dir()
+        if not getattr(sys, "frozen", False):
+            start_dir = os.path.dirname(start_dir)
         path = filedialog.asksaveasfilename(
-            defaultextension=".json",
-            filetypes=[("Gauge profile", "*.json")],
+            initialdir=start_dir,
+            defaultextension=".profile",
+            filetypes=[("Gauge profile", "*.profile"), ("All files", "*.*")],
             title="Save gauge profile",
         )
         if not path:
@@ -843,8 +868,12 @@ class Dashboard(tk.Tk):
             self._evt("Cannot edit gauge canvas during replay", "warn")
             return
         from tkinter import filedialog
+        start_dir = application_base_dir()
+        if not getattr(sys, "frozen", False):
+            start_dir = os.path.dirname(start_dir)
         path = filedialog.askopenfilename(
-            filetypes=[("Gauge profile", "*.json")],
+            initialdir=start_dir,
+            filetypes=[("Gauge profile", "*.profile"), ("All files", "*.*")],
             title="Load gauge profile",
         )
         if not path:
