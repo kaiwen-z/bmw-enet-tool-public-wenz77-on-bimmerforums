@@ -55,7 +55,7 @@ The issue is determined to be (drumroll please): Pressure sag on the low pressur
 
 - **🔌 Live Sensor Monitoring** - Real-time data from built-in engine parameters (and any sensors you define). Disable sensors by clicking their gauge or the sensor list row
 - **➕ User-Defined Sensors** - **Add**, **edit**, or **delete** sensors in the UI: label, DID (hex), ECU address, response size, units, gauge range, warning/danger thresholds, and calibration (raw hex → physical value). Each sensor gets a stable **`sensor_id`** used everywhere in the app and in saved layouts
-- **🎚️ Tk Canvas Gauge Surface** - Gauges are drawn on a **`tk.Canvas`**-based tile grid (circular, digital, bar styles), with layout saved per **`sensor_id`** in JSON profiles—not hard-coded widget_positions—so custom sensors slot into the same system as the defaults
+- **🎚️ Tk Canvas Gauge Surface** - Gauges are drawn on a **`tk.Canvas`**-based tile grid (circular, digital, bar styles), with layout saved per **`sensor_id`** in JSON profiles not hard-coded widget_positions so custom sensors slot into the same system as the defaults
 - **💾 JSONL Logging** - Logs are **newline-delimited JSON** (`.jsonl`): a header object (version, sensor metadata + **`sensor_id`**), then one JSON object per timestamp with all current readings keyed by **`sensor_id`**. Millisecond timestamps, easy to parse and extend. **Legacy CSV logs** still load in the plot viewer for older recordings
 - **🔄 Log Replay** - Replay recorded sessions with synchronized cursor. ENET disconnects while replay is active
 - **📈 Interactive Plotter** - Time-series visualization with zoom/pan; show/hide sensors from the legend. Works with **JSONL** and **CSV**
