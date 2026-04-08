@@ -65,14 +65,76 @@ def generate_colors(n):
 def pick_file():
     import tkinter as tk
     from tkinter import filedialog
+    try:
+        from .paths import application_base_dir
+        start_dir = application_base_dir()
+    except ImportError:
+        start_dir = os.path.dirname(os.path.abspath(__file__))
     root = tk.Tk()
     root.withdraw()
     path = filedialog.askopenfilename(
         title="Select BMW Sensor Log",
-        filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+        initialdir=start_dir,
+        filetypes=[("Log files", "*.jsonl *.csv"), ("All files", "*.*")],
     )
     root.destroy()
     return path
+
+
+def _load_jsonl(filepath):
+    """Parse a JSONL log into a DataFrame with a ``datetime`` column and
+    one column per sensor using ``label (unit)`` naming for compatibility
+    with the existing plot code."""
+    import json
+    rows = []
+    sensor_meta = {}  # sensor_id -> {label, unit}
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except Exception:
+                continue
+            if entry.get("type") == "header":
+                for info in entry.get("sensors", []):
+                    sensor_meta[info["sensor_id"]] = info
+                continue
+            ts = entry.get("ts", "")
+            readings = entry.get("d", {})
+            row = {"datetime": ts}
+            for sid, val in readings.items():
+                meta = sensor_meta.get(sid, {})
+                col = f"{meta.get('label', sid)} ({meta.get('unit', '?')})"
+                row[col] = val
+            rows.append(row)
+    df = pd.DataFrame(rows)
+    if "datetime" in df.columns:
+        df["datetime"] = pd.to_datetime(df["datetime"], errors="coerce")
+    return df
+
+
+def _load_csv(filepath):
+    """Load a legacy CSV log into a DataFrame."""
+    return pd.read_csv(filepath, parse_dates=["datetime"], encoding="latin-1")
+
+
+def _load_log(filepath):
+    """Auto-detect format and return a DataFrame."""
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == ".jsonl":
+        return _load_jsonl(filepath)
+    if ext == ".csv":
+        return _load_csv(filepath)
+    # Sniff first non-empty line
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if line.strip():
+                if line.strip().startswith("{"):
+                    return _load_jsonl(filepath)
+                break
+    return _load_csv(filepath)
 
 
 def main(filepath=None, replay_idx=None):
@@ -81,11 +143,11 @@ def main(filepath=None, replay_idx=None):
     if not filepath:
         sys.exit(0)
 
-    df = pd.read_csv(filepath, parse_dates=["datetime"], encoding="latin-1")
+    df = _load_log(filepath)
     sensor_cols = [c for c in df.columns if c != "datetime"]
     df[sensor_cols] = df[sensor_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
     if not sensor_cols:
-        print("No sensor columns found in the CSV.")
+        print("No sensor columns found in the log.")
         sys.exit(1)
 
     n_sensors = len(sensor_cols)

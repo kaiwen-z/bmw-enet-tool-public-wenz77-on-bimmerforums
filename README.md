@@ -53,15 +53,16 @@ The issue is determined to be (drumroll please): Pressure sag on the low pressur
 
 ## Features
 
-- **🔌 Live Sensor Monitoring** - Real-time data from 11 engine parameters. Disable sensors by clicking on their gauge or the sensor list dropdown
-- **💾 CSV Logging** - Timestamped data logging for later analysis. Files are created in the same directory as the livedashboard runs
-- **🔄 Log Replay** - Replay recorded sessions with synchronized cursor. ENET will disconnect when replay function is active
-- **📈 Interactive Plotter** - Advanced time-series visualization with zoom/pan to help you see the relationship between sensors. Activate / deactivate plotting of sensor data by clicking on their coloured box in the legend.
+- **🔌 Live Sensor Monitoring** - Real-time data from built-in engine parameters (and any sensors you define). Disable sensors by clicking their gauge or the sensor list row
+- **➕ User-Defined Sensors** - **Add**, **edit**, or **delete** sensors in the UI: label, DID (hex), ECU address, response size, units, gauge range, warning/danger thresholds, and calibration (raw hex → physical value). Each sensor gets a stable **`sensor_id`** used everywhere in the app and in saved layouts
+- **🎚️ Tk Canvas Gauge Surface** - Gauges are drawn on a **`tk.Canvas`**-based tile grid (circular, digital, bar styles), with layout saved per **`sensor_id`** in JSON profiles—not hard-coded widget_positions—so custom sensors slot into the same system as the defaults
+- **💾 JSONL Logging** - Logs are **newline-delimited JSON** (`.jsonl`): a header object (version, sensor metadata + **`sensor_id`**), then one JSON object per timestamp with all current readings keyed by **`sensor_id`**. Millisecond timestamps, easy to parse and extend. **Legacy CSV logs** still load in the plot viewer for older recordings
+- **🔄 Log Replay** - Replay recorded sessions with synchronized cursor. ENET disconnects while replay is active
+- **📈 Interactive Plotter** - Time-series visualization with zoom/pan; show/hide sensors from the legend. Works with **JSONL** and **CSV**
 - **🎯 Auto-Discovery** - Automatic detection of BMW ENET interface. Will scan the usual expected port range from 169.254.x.xxx. Generally all F chassis cars have a similar or same port 6801
-- **⚡ High Performance** - Sub-90ms sensor polling intervals. Note that de-activating sensors will make polling faster for all remaining ones.
-- **🎨 Dark Theme UI** - Professional "Precision Dark" instrument aesthetic. I love my dark themes.
-- **🔧 Configurable Sensors** - Enable/disable individual sensors by clicking on them
-- **⚠️ Warning Indicators** - Visual alerts for out-of-range values
+- **⚡ High Performance** - Sub-90ms sensor polling intervals. De-activating sensors speeds up polling for the rest
+- **🎨 Dark Theme UI** - “Precision Dark” instrument look. List areas use a **custom canvas-drawn scrollbar** (native `tk.Scrollbar` does not honor dark colours reliably on Windows)
+- **⚠️ Warning Indicators** - Visual alerts for out-of-range values based on per-sensor thresholds
 
 ---
 
@@ -164,9 +165,9 @@ We have:
 - Watchdog timer - Auto-recovery from ECU stalls
 
 And logging capabilities:
-- CSV logging with millisecond timestamps
+- **JSONL** logging with millisecond timestamps, discrete **`sensor_id`** keys, and a structured header line
 - Multiprocess log viewer (doesn't block main dashboard)
-- Shared memory for cursor synchronization
+- Shared memory for cursor synchronization during replay
 - Multiple visualization modes (Raw, Min-Max %, Z-Score, Dual-Y)
 
 ```python
@@ -180,7 +181,7 @@ p = multiprocessing.Process(
 
 ## Challenge 5: GUI iterations
 
-The GUI went through several iterations before settling for a hybrid bar graph, digital display, and circular gauge UI. Additionally Tkinter's native scrollbar for the sensor dropdown ignored custom colour settings on windows, so the scrollbar is actually a custom `tk.Canvas` object.
+The GUI went through several iterations before settling on a hybrid **bar**, **digital**, and **circular** gauge UI hosted on a shared **`tk.Canvas`** “gauge host” so tiles can be placed, resized, and persisted in JSON by **`sensor_id`**. Tkinter’s native **scrollbar** ignored custom colours on Windows, so the **sensor list** (and scrollable dialogs such as **add/edit sensor**) use a small **canvas-drawn scrollbar** (`CanvasScrollbar`) with theme-matched trough and thumb. The **sensor editor** is a scrollable form so long calibration sections stay usable on small displays.
 
 ![image](/media/IMG20260304003506.jpg)
 
@@ -193,21 +194,22 @@ The GUI went through several iterations before settling for a hybrid bar graph, 
 - Windows/Linux (macOS untested)
 
 ```bash
-pip install numpy pandas matplotlib tkinter
+pip install numpy pandas matplotlib
 ```
+*(Tkinter ships with most Python installs on Windows.)*
 
-Then clone the repository, install dependencies and run the python file
+Then clone the repository, install dependencies, and run from the **`src`** folder:
 
 ```bash
 git clone https://github.com/kaiwen-z/bmw-enet-tool-public-wenz77-on-bimmerforums.git
-cd bmw-enet-tool-public-wenz77-on-bimmerforums/sourcecode
+cd bmw-enet-tool-public-wenz77-on-bimmerforums/src
 pip install -r requirements.txt
-python bmw_dashboard.py
+python -m bmw_enet_tool
 ```
 
-**OR**
+**Building an `.exe` (PyInstaller):** from `src`, run `build_exe.bat` (see `dashboard_launcher.py`) or use `python -m PyInstaller` as documented in the batch file.
 
-Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged with pyInstaller)
+**OR** use a pre-built **`BMW_ENET_Dashboard.exe`** if you distribute a standalone build.
 
 ## Usage
 
@@ -235,24 +237,26 @@ Use the bmw_dashboard.exe if you want a standalone packaged version. (Packaged w
     - Click sensor rows to enable/disable individual gauges
 
 3. Logging
-    - START LOGGING creates timestamped CSV
-    - Logs saved to script directory
-    - VIEW LOG opens interactive plotter
+    - START LOGGING creates a timestamped **`.jsonl`** file next to the app (exe directory when frozen, or `src` when running from source)
+    - Each line is JSON; the first special line is a **header** (`type: header`, sensor list with **`sensor_id`**); following lines are readings keyed by **`sensor_id`**
+    - VIEW LOG opens the interactive plotter (**JSONL** or legacy **CSV**)
+4. Sensors
+    - Use **+ Add** / **Edit…** / **Delete…** in the sensor list to define any DID you want (hex address, ECU, size, calibration). New sensors can be added to the gauge canvas like built-ins (**sensor_id**-stable across saves)
 
-4. Replay Mode
+5. Replay Mode
     - REPLAY loads existing log
     - Timeline bar appears at bottom
     - Use ⏮ ▶ ⏭ controls or drag slider
     - Spacebar toggles play/pause
 
-5. Log Viewer
+6. Log Viewer
     - Click sensor rows to show/hide lines
     - Scroll wheel to zoom in/out
     - Click-drag to pan left/right
     - Bottom slider for quick navigation
     - Mode buttons: Raw | Min-Max % | Z-Score | Dual Y
 
-**📊 Supported Sensors**
+**📊 Built-in sensors (extend or replace via Add / Edit in the UI)**
 
 ```text
 Engine RPM — DID: 0x4807 | ECU: 0x12 | Range: 0-8000 | Unit: RPM
@@ -271,10 +275,14 @@ Valvetronic Angle — DID: 0x58A2 | ECU: 0x12 | Range: 0-60 | Unit: deg
 ## Contributing
 
 Contributions welcome! Areas needing help:
-- Implement custom DID definitions via GUI
+- More built-in DIDs / vehicle coverage (transmission, chassis, other engines)
 - Create mobile companion app
-- Add more sensors (transmission, chassis, etc.)
+- Packaging and docs for Linux/macOS
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+Open-source BMW ENET live dashboard and **JSONL** logger with **tk.Canvas** gauges, **user-defined sensors** (DID / ECU / calibration) keyed by **`sensor_id`**, log replay, and a matplotlib log viewer—built for real-time N55 diagnostics without extra hardware beyond an ENET cable.

@@ -402,7 +402,7 @@ class DigitalGauge(tk.Canvas):
 # ─────────────────────────────────────────────────────────
 class BarGauge(tk.Canvas):
     """A compact horizontal bar gauge for pressure sensors."""
-    W, H = 310, 58
+    W, H = 310, 48
 
     def __init__(self, master, label, unit, lo, hi, warn, danger, decimals, **kwargs):
         super().__init__(master, width=1, height=self.H,
@@ -416,67 +416,111 @@ class BarGauge(tk.Canvas):
         self._W            = self.W
         self._H            = self.H
         self._last_w       = 0
+        self._last_h       = 0
         self._val_id       = None
         self._raw_id       = None
         self._bar_id       = None
+        self._bx0 = self._bx1 = self._by0 = self._by1 = 0
         self.bind("<Configure>", self._on_bar_resize)
 
+    def _span(self):
+        s = self.hi - self.lo
+        return s if abs(s) > 1e-9 else 1.0
+
+    def _recompute_layout(self):
+        """Set draw geometry from current _W/_H; vertically centered, safe side margins."""
+        W, H = max(int(self._W), 20), max(int(self._H), 12)
+        self._W, self._H = W, H
+        mx = max(5, min(14, W // 28 + 4))
+        my = max(3, min(8, H // 12))
+        bx0, bx1 = mx, max(mx + 8, W - mx - 1)
+        bar_h = max(8, min(15, H // 4 + 4))
+        lh = 10
+        vgap = max(2, H // 18)
+        vline = max(10, min(14, H // 5))
+        raw_h = 9
+        stack = lh + vgap + vline + vgap + bar_h + vgap + raw_h
+        inner = H - 2 * my
+        y_top = my + max(0, (inner - stack) // 2)
+        y_lab = y_top + lh // 2
+        y_val = y_top + lh + vgap + vline // 2
+        yb0 = y_top + lh + vgap + vline + vgap
+        yb1 = yb0 + bar_h
+        y_raw = min(H - my, yb1 + vgap + raw_h - 2)
+        self._bx0, self._bx1 = bx0, bx1
+        self._by0, self._by1 = yb0, yb1
+        self._mx, self._my = mx, my
+        self._y_lab = y_lab
+        self._y_val = y_val
+        self._y_raw = max(y_raw, yb1 + 2)
+        self._val_font = ("Courier New", max(9, min(12, W // 28)), "bold")
+        self._raw_font = ("Courier New", max(6, min(8, W // 45)))
+
     def _draw_static(self):
+        self._recompute_layout()
         W, H = self._W, self._H
-        # Label top-left
-        self.create_text(8, 8, anchor="nw", text=self.label,
+        mx, my = self._mx, self._my
+        bx0, bx1, by0, by1 = self._bx0, self._bx1, self._by0, self._by1
+        tw = bx1 - bx0
+        sp = self._span()
+        self.create_text(mx, self._y_lab, anchor="w", text=self.label,
                          fill=LABEL_C, font=("Segoe UI", 8, "bold"), tags="static")
-        # Unit top-right
-        self.create_text(W-8, 8, anchor="ne", text=self.unit,
+        self.create_text(W - mx, self._y_lab, anchor="e", text=self.unit,
                          fill=UNIT_C, font=("Segoe UI", 7), tags="static")
-        # Track background
-        bx0, by0, bx1, by1 = 8, 26, W-8, 42
         self.create_rectangle(bx0, by0, bx1, by1, fill=STRIP_BG, outline=BORDER, width=1, tags="static")
-        # Warn marker
-        wx = bx0 + int((self.warn - self.lo) / (self.hi - self.lo) * (bx1 - bx0))
-        self.create_line(wx, by0-3, wx, by1+3, fill=RING_WARN, width=1, dash=(2,2), tags="static")
-        # Danger marker
-        dx = bx0 + int((self.danger - self.lo) / (self.hi - self.lo) * (bx1 - bx0))
-        self.create_line(dx, by0-3, dx, by1+3, fill=RING_DANG, width=1, dash=(2,2), tags="static")
-        # Value display (centered above bar so it never overlaps)
-        self._val_id = self.create_text(W/2, 18,
+        f_warn = (self.warn - self.lo) / sp
+        f_dang = (self.danger - self.lo) / sp
+        wx = bx0 + int(max(0.0, min(1.0, f_warn)) * tw)
+        dx = bx0 + int(max(0.0, min(1.0, f_dang)) * tw)
+        wx = max(bx0, min(bx1, wx))
+        dx = max(bx0, min(bx1, dx))
+        self.create_line(wx, by0 - 2, wx, by1 + 2, fill=RING_WARN, width=1, dash=(2, 2), tags="static")
+        self.create_line(dx, by0 - 2, dx, by1 + 2, fill=RING_DANG, width=1, dash=(2, 2), tags="static")
+        self._val_id = self.create_text(W / 2, self._y_val,
                                         text="—",
                                         fill=VALUE_C,
-                                        font=("Courier New", 12, "bold"),
-                                        anchor="center")
-
-        # Raw value bottom right
-        self._raw_id = self.create_text(W-8, H-6,
+                                        font=self._val_font,
+                                        anchor="center", tags="static")
+        self._raw_id = self.create_text(W - mx, self._y_raw,
                                         anchor="se",
                                         text="raw: —",
                                         fill=RAW_C,
-                                        font=("Courier New", 7))
+                                        font=self._raw_font)
         self._bar_id = None
         self._draw_bar(self.lo)
 
     def _draw_bar(self, value):
         if self._bar_id:
             self.delete(self._bar_id)
-        W = self._W
-        bx0, by0, bx1, by1 = 9, 27, W-9, 41
-        frac  = max(0.0, min(1.0, (value - self.lo) / (self.hi - self.lo)))
-        color = (RING_DANG if frac >= (self.danger-self.lo)/(self.hi-self.lo)
-                 else RING_WARN if frac >= (self.warn-self.lo)/(self.hi-self.lo)
+        bx0, by0, bx1, by1 = self._bx0, self._by0, self._bx1, self._by1
+        ins0, ins1 = bx0 + 1, bx1 - 1
+        if ins1 <= ins0:
+            return
+        span = self._span()
+        frac = max(0.0, min(1.0, (value - self.lo) / span))
+        f_d = max(0.0, min(1.0, (self.danger - self.lo) / span))
+        f_w = max(0.0, min(1.0, (self.warn - self.lo) / span))
+        color = (RING_DANG if frac >= f_d
+                 else RING_WARN if frac >= f_w
                  else RING_NORM)
-        fill_x = bx0 + int(frac * (bx1 - bx0))
-        if fill_x > bx0:
-            self._bar_id = self.create_rectangle(bx0, by0, fill_x, by1,
+        fill_x = ins0 + int(frac * (ins1 - ins0))
+        if fill_x > ins0:
+            self._bar_id = self.create_rectangle(ins0, by0 + 1, fill_x, by1 - 1,
                                                   fill=color, outline="")
         else:
-            self._bar_id = self.create_rectangle(bx0, by0, bx0+1, by1,
+            self._bar_id = self.create_rectangle(ins0, by0 + 1, ins0 + 1, by1 - 1,
                                                   fill=RING_DIM, outline="")
+        self._raise_overlay()
+
+    def _raise_overlay(self):
+        self.tag_raise("overlay")
 
     def _on_bar_resize(self, event):
-        w = event.width
-        if w == self._last_w or w < 20:
+        w, h = event.width, event.height
+        if w < 20 or h < 8 or (w == self._last_w and h == self._last_h):
             return
-        self._last_w = w
-        self._W = w
+        self._last_w, self._last_h = w, h
+        self._W, self._H = w, h
         self.delete("all")
         self._bar_id = None
         self._draw_static()
@@ -492,16 +536,16 @@ class BarGauge(tk.Canvas):
         self.delete("overlay")
         if not active:
             W, H = self._W, self._H
+            fs = max(10, min(15, int(H * 0.28)))
             self.create_rectangle(0, 0, W, H,
-                                  fill=GAUGE_BG, outline="", stipple=STIPPLE,
+                                  fill=GAUGE_BG, outline="",
                                   tags="overlay")
             self.create_rectangle(0, 0, W, H,
                                   fill="", outline=BORDER, tags="overlay")
-            self.create_text(W // 2, H // 2, text="CLICK TO ACTIVATE",
-                             fill=OVERLAY_TEXT, font=("Segoe UI", 7),
-                             tags="overlay")
-            self.create_text(8, 8, anchor="nw", text=self.label,
-                             fill=OVERLAY_LABEL_DIM, font=("Segoe UI", 8, "bold"),
+            self.create_text(W // 2, H // 2,
+                             text=f"CLICK TO ACTIVATE\n{self.label}",
+                             fill=OVERLAY_TEXT, font=("Segoe UI", fs, "bold"),
+                             justify="center",
                              tags="overlay")
             self.configure(cursor="hand2")
             self.bind("<Button-1>", self._toggle)
@@ -523,12 +567,14 @@ class BarGauge(tk.Canvas):
                  else VALUE_C)
         self.itemconfig(self._val_id, text=f"{physical:.{self.decimals}f}", fill=vcol)
         self.itemconfig(self._raw_id, text=f"raw: {raw_int}", fill=RAW_C)
+        self._raise_overlay()
 
     def set_stale(self):
         self._value = None; self._raw = None
         self._draw_bar(self.lo)
         self.itemconfig(self._val_id, text="—", fill=DIM)
         self.itemconfig(self._raw_id, text="raw: —", fill=RAW_C)
+        self._raise_overlay()
 
 
 # ─────────────────────────────────────────────────────────
@@ -539,10 +585,13 @@ class CanvasScrollbar(tk.Canvas):
     WIDTH = 14
 
     def __init__(self, master, command=None, troughcolor=BORDER, thumbcolor=None,
-                 thumbactive=UNIT_C, **kwargs):
+                 thumbactive=UNIT_C, bar_width=None, **kwargs):
         _bg = master.cget("bg") if hasattr(master, "cget") else PANEL
-        super().__init__(master, width=self.WIDTH, height=100, bg=_bg,
-                         bd=0, highlightthickness=0, **kwargs)
+        bar_w = int(bar_width) if bar_width is not None else self.WIDTH
+        self._bar_w = bar_w
+        kw = dict(width=bar_w, height=100, bg=_bg, bd=0, highlightthickness=0)
+        kw.update(kwargs)
+        super().__init__(master, **kw)
         self._command   = command
         self._trough_c  = troughcolor
         self._thumb_c   = thumbcolor if thumbcolor is not None else UNIT_C
@@ -574,7 +623,7 @@ class CanvasScrollbar(tk.Canvas):
 
     def _draw(self):
         self.delete("scrollbar")
-        w = self.winfo_width() or self.WIDTH
+        w = self.winfo_width() or getattr(self, "_bar_w", self.WIDTH)
         h = self.winfo_height() or 100
         # Trough (track background)
         self.create_rectangle(2, 0, w - 2, h, fill=self._trough_c, outline="", tags="scrollbar")

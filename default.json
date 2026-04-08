@@ -1,0 +1,93 @@
+{
+  "version": 2,
+  "gauges": [
+    {
+      "sensor_id": "engine_rpm",
+      "kind": "circular",
+      "relx": 0.0,
+      "rely": 0.0,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    },
+    {
+      "sensor_id": "battery_voltage",
+      "kind": "circular",
+      "relx": 0.0,
+      "rely": 0.3333,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    },
+    {
+      "sensor_id": "lp_fuel_pressure",
+      "kind": "bar",
+      "relx": 0.3333,
+      "rely": 0.625,
+      "relwidth": 0.3333,
+      "relheight": 0.125
+    },
+    {
+      "sensor_id": "hp_rail_pressure",
+      "kind": "bar",
+      "relx": 0.3333,
+      "rely": 0.75,
+      "relwidth": 0.3333,
+      "relheight": 0.125
+    },
+    {
+      "sensor_id": "coolant_temp",
+      "kind": "circular",
+      "relx": 0.6667,
+      "rely": 0.3333,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    },
+    {
+      "sensor_id": "oil_pressure",
+      "kind": "circular",
+      "relx": 0.3333,
+      "rely": 0.0,
+      "relwidth": 0.3333,
+      "relheight": 0.2917
+    },
+    {
+      "sensor_id": "engine_oil_temp",
+      "kind": "circular",
+      "relx": 0.6667,
+      "rely": 0.0,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    },
+    {
+      "sensor_id": "boost_pressure",
+      "kind": "circular",
+      "relx": 0.3333,
+      "rely": 0.2917,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    },
+    {
+      "sensor_id": "throttle_angle",
+      "kind": "digital",
+      "relx": 0.0,
+      "rely": 0.6667,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    },
+    {
+      "sensor_id": "intake_pressure",
+      "kind": "bar",
+      "relx": 0.3333,
+      "rely": 0.875,
+      "relwidth": 0.3333,
+      "relheight": 0.125
+    },
+    {
+      "sensor_id": "valvetronic_angle",
+      "kind": "digital",
+      "relx": 0.6667,
+      "rely": 0.6667,
+      "relwidth": 0.3333,
+      "relheight": 0.3333
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 """BMW F10 535i Live Sensor Dashboard - application shell (split from sourcecode)."""
 
-import csv
+import json as _json
 import multiprocessing
 import os
 import queue
@@ -9,13 +9,22 @@ import sys
 import threading
 import time
 import tkinter as tk
+from tkinter import messagebox
 from datetime import datetime
 
 from . import log_viewer
+from .paths import application_base_dir
 from .protocol import DYN_H, DYN_L, TESTER, hsfz, parse_hsfz
-from .sensors import SENSORS
+from .sensors import (
+    SENSORS, get_sensors, get_sensor_by_id, sensor_id_at, index_of,
+    add_sensor, update_sensor, delete_sensor,
+)
 from .ui_theme import *  # noqa: F403
-from .widgets import BarGauge, CanvasScrollbar, DigitalGauge, Gauge, GroupBox
+from .gauge_canvas import GaugeHost
+from .gauge_editor_dialog import GaugeEditorDialog
+from .gauge_profile import DEFAULT_GAUGE_PROFILE, load_profile, save_profile
+from .sensor_editor_dialog import SensorEditorDialog
+from .widgets import CanvasScrollbar
 
 
 def _launch_log_viewer(filepath):
@@ -36,7 +45,6 @@ class Dashboard(tk.Tk):
         self.update_idletasks()
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
-        # Open at ~88% of screen size, clamped to min/max
         w = max(1000, min(sw, int(sw * 0.88)))
         h = max(600, min(sh, int(sh * 0.85)))
         x = (sw - w) // 2
@@ -50,50 +58,39 @@ class Dashboard(tk.Tk):
         self._rx_buf    = b""
         self._vin       = "—"
 
-        # Sensor polling queue: list of (ecu, did, size, scale_fn, gauge_idx)
+        # Sensor polling queue: list of (ecu, did, size, scale_fn, sensor_id)
         self._poll_queue   = []
         self._poll_idx     = 0
-        self._poll_pending = None   # (did, size, scale_fn, gauge_idx)
+        self._poll_pending = None   # (did, size, scale_fn, sensor_id, gen, ecu)
         self._poll_active  = False
-        self._poll_delay   = 20     # ms between sensor polls (NRC fallback only)
+        self._poll_delay   = 20
 
-        # Sensor delay tracking for the header display
-        self._last_sensor_time = None   # time.monotonic() of last sensor update
-        self._delay_samples    = []     # rolling window of inter-update intervals
+        self._last_sensor_time = None
+        self._delay_samples    = []
 
-        # CSV logging
-        self._log_file     = None   # open file handle
-        self._log_writer   = None   # csv.writer
+        # JSON logging
+        self._log_file     = None
+        self._log_writer   = None   # not used for JSON; kept for compat
         self._logging      = False
-        self._log_latest   = {}     # g_idx → latest physical value
-        self._log_path     = ""     # path of current log file
-        self._log_row_count = 0     # flush every 50 rows to avoid blocking main thread
+        self._log_latest   = {}     # sensor_id -> latest physical value
+        self._log_path     = ""
+        self._log_row_count = 0
 
-        # Socket send lock — keepalive and sensor worker threads both call sendall();
-        # without this their bytes can interleave on the wire and corrupt HSFZ framing.
         self._send_lock = threading.Lock()
-
-        # True during a stall-triggered reconnect so the "disconnected" event
-        # from the dying old worker doesn't clear _polling or _running prematurely.
         self._stall_reconnecting = False
 
-        self._disabled_gauges = set()   # g_idx values currently toggled off
+        self._disabled_gauges = set()   # sensor_id strings
 
-        # Poll generation counter — incremented each time _poll_next fires.
-        # Stored in the queue message so _drain_queue can reject stale responses
-        # that arrived after the stall timeout already advanced to the next sensor.
         self._poll_gen = 0
-
-        # Watchdog: restart polling if no sensor update arrives for several cycles
-        self._last_gauge_update = None   # time.monotonic() of last successful sensor read
-        self._watchdog_id       = None   # after() handle
+        self._last_gauge_update = None
+        self._watchdog_id       = None
 
         # Log replay
-        self._replay_data     = []
+        self._replay_data     = []    # list of (ts_str, {sensor_id: phys})
         self._replay_idx      = 0
-        self._replay_state    = "idle"   # "idle" | "paused" | "playing"
+        self._replay_state    = "idle"
         self._replay_after_id = None
-        self._replay_load_gen = 0  # ignore stale background-load completions
+        self._replay_load_gen = 0
 
         self._build_ui()
         self.bind_all("<Button-1>", self._on_global_click)
@@ -104,7 +101,6 @@ class Dashboard(tk.Tk):
     #  Build UI
     # ──────────────────────────────────────────
     def _build_ui(self):
-        # ── Header bar ──
         hdr = tk.Frame(self, bg=PANEL, height=56)
         hdr.pack(fill="x"); hdr.pack_propagate(False)
 
@@ -113,7 +109,6 @@ class Dashboard(tk.Tk):
         tk.Label(hdr, text="FXX  35i  N55  ·  LIVE DIAGNOSTICS",
                  bg=PANEL, fg=DIM, font=("Segoe UI", 10)).pack(side="left", pady=14)
 
-        # VIN display
         vin_frame = tk.Frame(hdr, bg=PANEL)
         vin_frame.pack(side="left", padx=30, pady=10)
         tk.Label(vin_frame, text="VIN", bg=PANEL, fg=META_C,
@@ -122,13 +117,11 @@ class Dashboard(tk.Tk):
         tk.Label(vin_frame, textvariable=self._vin_var, bg=PANEL, fg=VIN_C,
                  font=("Courier New", 11, "bold")).pack(anchor="w")
 
-        # Status dot + label
         self._sdot = tk.Label(hdr, text="●", bg=PANEL, fg=DIM, font=("Segoe UI", 16))
         self._sdot.pack(side="right", padx=(4, 18))
         self._slbl = tk.Label(hdr, text="OFFLINE", bg=PANEL, fg=DIM, font=SMALL_FONT)
         self._slbl.pack(side="right")
 
-        # Refresh interval
         ri_frame = tk.Frame(hdr, bg=PANEL)
         ri_frame.pack(side="right", padx=20)
         tk.Label(ri_frame, text="avg sensor delay", bg=PANEL, fg=META_C,
@@ -139,7 +132,6 @@ class Dashboard(tk.Tk):
 
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
-        # ── Body ──
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True)
 
@@ -168,7 +160,7 @@ class Dashboard(tk.Tk):
             cursor="hand2", command=self._discover_car)
         self._discover_btn.pack(side="right", fill="y", padx=(4, 0))
 
-        self._field(side, "Port",       self._port_var)
+        self._field(side, "Port", self._port_var)
 
         self._cbtn = tk.Button(side, text="⬡  CONNECT", bg=ACCENT, fg=WHITE,
                                activebackground=ACCENT_ACTIVE, activeforeground=WHITE,
@@ -187,11 +179,21 @@ class Dashboard(tk.Tk):
                                    state="disabled")
         self._poll_btn.pack(fill="x", padx=16, pady=(2, 4))
 
+        # ── Logging (collapsible) ──
         self._sep(side)
-        tk.Label(side, text="  LOGGING", bg=PANEL, fg=DIM,
-                 font=("Segoe UI", 8, "bold"), anchor="w").pack(fill="x", pady=(4, 6))
+        self._logging_expanded = False
+        logging_hdr = tk.Frame(side, bg=PANEL, cursor="hand2")
+        logging_hdr.pack(fill="x", pady=(4, 0))
+        self._logging_arrow = tk.Label(logging_hdr, text="▸", bg=PANEL, fg=DIM,
+                                       font=("Segoe UI", 8), cursor="hand2")
+        self._logging_arrow.pack(side="left", padx=(8, 0))
+        tk.Label(logging_hdr, text="LOGGING", bg=PANEL, fg=DIM,
+                 font=("Segoe UI", 8, "bold"), anchor="w",
+                 cursor="hand2").pack(side="left", padx=2)
 
-        self._log_btn = tk.Button(side, text="⏺  START LOGGING", bg=BTN_BG, fg=DIM,
+        logging_container = tk.Frame(side, bg=PANEL)
+
+        self._log_btn = tk.Button(logging_container, text="⏺  START LOGGING", bg=BTN_BG, fg=DIM,
                                   activebackground=BTN_ACTIVE_BG, activeforeground=TEXT,
                                   font=("Segoe UI", 9, "bold"), bd=0, pady=8,
                                   cursor="hand2", command=self._toggle_logging,
@@ -199,11 +201,11 @@ class Dashboard(tk.Tk):
         self._log_btn.pack(fill="x", padx=16, pady=(2, 2))
 
         self._log_name_var = tk.StringVar(value="no log active")
-        tk.Label(side, textvariable=self._log_name_var, bg=PANEL, fg=META_C,
+        tk.Label(logging_container, textvariable=self._log_name_var, bg=PANEL, fg=META_C,
                  font=("Courier New", 6), wraplength=196, justify="left",
                  anchor="w").pack(fill="x", padx=16, pady=(0, 4))
 
-        view_row = tk.Frame(side, bg=PANEL)
+        view_row = tk.Frame(logging_container, bg=PANEL)
         view_row.pack(fill="x", padx=16, pady=(2, 4))
         view_row.columnconfigure(0, weight=1, uniform="logbtn")
         view_row.columnconfigure(1, weight=1, uniform="logbtn")
@@ -218,11 +220,26 @@ class Dashboard(tk.Tk):
         self._replay_btn.grid(row=0, column=1, sticky="nsew", padx=(2, 0))
         self._replay_name_var = tk.StringVar(value="")
         self._replay_name_lbl = tk.Label(
-            side, textvariable=self._replay_name_var, bg=PANEL, fg=META_C,
+            logging_container, textvariable=self._replay_name_var, bg=PANEL, fg=META_C,
             font=("Courier New", 6), wraplength=196, justify="left", anchor="w")
         self._replay_name_lbl.pack(fill="x", padx=16, pady=(0, 2))
         self._replay_name_lbl.pack_forget()
 
+        def _toggle_logging_controls(_event=None):
+            if self._logging_expanded:
+                logging_container.pack_forget()
+                self._logging_arrow.configure(text="▸")
+                self._logging_expanded = False
+            else:
+                logging_container.pack(fill="x", pady=(0, 2), after=logging_hdr)
+                self._logging_arrow.configure(text="▾")
+                self._logging_expanded = True
+
+        logging_hdr.bind("<Button-1>", _toggle_logging_controls)
+        for child in logging_hdr.winfo_children():
+            child.bind("<Button-1>", _toggle_logging_controls)
+
+        # ── Sensor list (collapsible) ──
         self._sep(side)
         self._sensor_expanded = False
         sensor_hdr = tk.Frame(side, bg=PANEL, cursor="hand2")
@@ -235,11 +252,24 @@ class Dashboard(tk.Tk):
                  cursor="hand2").pack(side="left", padx=2)
 
         SENSOR_LIST_HEIGHT = 160
-        sensor_container = tk.Frame(side, bg=PANEL, height=SENSOR_LIST_HEIGHT)
-        sensor_container.pack_propagate(False)
+        self._sensor_container = tk.Frame(side, bg=PANEL, height=SENSOR_LIST_HEIGHT)
+        self._sensor_container.pack_propagate(False)
 
-        sensor_canvas = tk.Canvas(sensor_container, bg=PANEL, bd=0, highlightthickness=0)
-        sensor_inner = tk.Frame(sensor_canvas, bg=PANEL)
+        # Sensor management buttons
+        _mgmt_row = tk.Frame(self._sensor_container, bg=PANEL)
+        _mgmt_row.pack(fill="x", padx=12, pady=(4, 4))
+        _mgmt_kw = dict(bg=BTN_BG, fg=DIM, activebackground=BTN_ACTIVE_BG,
+                        activeforeground=TEXT, font=("Segoe UI", 7), bd=0,
+                        cursor="hand2", padx=4)
+        tk.Button(_mgmt_row, text="+ Add", command=self._add_sensor_dialog, **_mgmt_kw
+                  ).pack(side="left", padx=(0, 2))
+        tk.Button(_mgmt_row, text="Edit…", command=self._edit_sensor_dialog, **_mgmt_kw
+                  ).pack(side="left", padx=(0, 2))
+        tk.Button(_mgmt_row, text="Delete…", command=self._delete_sensor_dialog, **_mgmt_kw
+                  ).pack(side="left")
+
+        sensor_canvas = tk.Canvas(self._sensor_container, bg=PANEL, bd=0, highlightthickness=0)
+        self._sensor_inner = tk.Frame(sensor_canvas, bg=PANEL)
 
         def _canvas_yview(*args):
             sensor_canvas.yview(*args)
@@ -247,27 +277,30 @@ class Dashboard(tk.Tk):
             sensor_scroll.set(first, last)
 
         sensor_scroll = CanvasScrollbar(
-            sensor_container, command=_canvas_yview,
+            self._sensor_container, command=_canvas_yview,
             troughcolor=BORDER, thumbactive=LABEL_C
         )
-        sensor_win_id = sensor_canvas.create_window((0, 0), window=sensor_inner, anchor="nw")
+        self._sensor_win_id = sensor_canvas.create_window((0, 0), window=self._sensor_inner, anchor="nw")
         sensor_canvas.configure(yscrollcommand=sensor_scroll.set)
+        self._sensor_canvas = sensor_canvas
+        self._sensor_scroll = sensor_scroll
 
         def _update_sensor_scroll_region(*_):
             sensor_canvas.update_idletasks()
             try:
-                cw = max(sensor_canvas.winfo_width() or 1, sensor_inner.winfo_reqwidth() or 1)
-                ch = sensor_inner.winfo_reqheight() or sensor_inner.winfo_height() or 1
+                cw = max(sensor_canvas.winfo_width() or 1, self._sensor_inner.winfo_reqwidth() or 1)
+                ch = self._sensor_inner.winfo_reqheight() or self._sensor_inner.winfo_height() or 1
                 if ch > 0:
                     sensor_canvas.configure(scrollregion=(0, 0, cw, ch))
             except Exception:
                 sensor_canvas.configure(scrollregion=sensor_canvas.bbox("all"))
             first, last = sensor_canvas.yview()
             sensor_scroll.set(first, last)
-        sensor_inner.bind("<Configure>", _update_sensor_scroll_region)
+        self._sensor_inner.bind("<Configure>", _update_sensor_scroll_region)
+        self._update_sensor_scroll_region = _update_sensor_scroll_region
 
         def _on_sensor_canvas_configure(event):
-            sensor_canvas.itemconfig(sensor_win_id, width=event.width)
+            sensor_canvas.itemconfig(self._sensor_win_id, width=event.width)
         sensor_canvas.bind("<Configure>", _on_sensor_canvas_configure)
 
         def _sync_scrollbar():
@@ -279,43 +312,25 @@ class Dashboard(tk.Tk):
             self.after(0, _sync_scrollbar)
             return "break"
         sensor_canvas.bind("<MouseWheel>", _sensor_mousewheel)
-        sensor_inner.bind("<MouseWheel>", _sensor_mousewheel)
-        sensor_container.bind("<MouseWheel>", _sensor_mousewheel)
+        self._sensor_inner.bind("<MouseWheel>", _sensor_mousewheel)
+        self._sensor_container.bind("<MouseWheel>", _sensor_mousewheel)
+        self._sensor_mousewheel = _sensor_mousewheel
 
-        self._sensor_list_rows = []
-        for i, (lbl, did, ecu, sz, *_) in enumerate(SENSORS):
-            r = tk.Frame(sensor_inner, bg=PANEL, cursor="hand2")
-            r.pack(fill="x", padx=12, pady=1)
-            r.bind("<MouseWheel>", _sensor_mousewheel)
-            l1 = tk.Label(r, text=f"0x{did:04X}", bg=PANEL, fg=DIM,
-                         font=("Courier New", 8), width=6, anchor="w", cursor="hand2")
-            l1.pack(side="left")
-            l1.bind("<MouseWheel>", _sensor_mousewheel)
-            l2 = tk.Label(r, text=lbl, bg=PANEL, fg=LABEL_C,
-                          font=SMALL_FONT, anchor="w", cursor="hand2")
-            l2.pack(side="left", padx=4)
-            l2.bind("<MouseWheel>", _sensor_mousewheel)
-            def _make_row_click(idx):
-                def _on_click(_event=None):
-                    self._toggle_sensor_by_index(idx)
-                return _on_click
-            _row_click = _make_row_click(i)
-            r.bind("<Button-1>", _row_click)
-            l1.bind("<Button-1>", _row_click)
-            l2.bind("<Button-1>", _row_click)
-            self._sensor_list_rows.append((r, l1, l2))
+        self._sensor_list_rows = {}  # sensor_id -> (frame, l1, l2)
+        self._rebuild_sensor_list_ui()
 
         sensor_scroll.pack(side="right", fill="y")
         sensor_canvas.pack(side="left", fill="both", expand=True)
 
+        self._sensor_hdr = sensor_hdr
+
         def _toggle_sensor_list(_event=None):
             if self._sensor_expanded:
-                sensor_container.pack_forget()
+                self._sensor_container.pack_forget()
                 self._sensor_arrow.configure(text="▸")
                 self._sensor_expanded = False
             else:
-                sensor_container.pack(fill="x", pady=(0, 2),
-                                      after=sensor_hdr)
+                self._sensor_container.pack(fill="x", pady=(0, 2), after=sensor_hdr)
                 self._sensor_arrow.configure(text="▾")
                 self._sensor_expanded = True
                 self.after(50, _update_sensor_scroll_region)
@@ -354,93 +369,52 @@ class Dashboard(tk.Tk):
         gauge_outer = tk.Frame(body, bg=BG)
         gauge_outer.pack(side="left", fill="both", expand=True)
 
-        # Subtitle strip
         strip = tk.Frame(gauge_outer, bg=STRIP_BG, height=28)
         strip.pack(fill="x"); strip.pack_propagate(False)
-        tk.Label(strip, text="  LIVE SENSOR READOUT  ·  ECU 0x12 (N55 DME)",
+        tk.Label(strip, text="  LIVE SENSOR READOUT  \u00b7  ECU 0x12 (N55 DME)",
                  bg=STRIP_BG, fg=DIM, font=("Segoe UI", 7)).pack(side="left", pady=6)
-        tk.Label(strip, text="† scale factors estimated — verify against known conditions",
-                 bg=STRIP_BG, fg=RAW_C, font=("Segoe UI", 7)).pack(side="right", padx=10)
+
+        _sbtn = dict(bg=BTN_BG, fg=DIM, activebackground=BTN_ACTIVE_BG,
+                     activeforeground=TEXT, font=("Segoe UI", 7), bd=0,
+                     cursor="hand2", padx=6)
+        tk.Button(strip, text="+ Add gauge",
+                  command=self._add_gauge_dialog, **_sbtn
+                  ).pack(side="right", padx=2, pady=4)
+        tk.Button(strip, text="Save profile\u2026",
+                  command=self._save_gauge_profile, **_sbtn
+                  ).pack(side="right", padx=2, pady=4)
+        tk.Button(strip, text="Load profile\u2026",
+                  command=self._open_gauge_profile, **_sbtn
+                  ).pack(side="right", padx=2, pady=4)
+        tk.Button(strip, text="Reset layout",
+                  command=self._reset_gauge_profile, **_sbtn
+                  ).pack(side="right", padx=2, pady=4)
+        tk.Button(strip, text="Fit to canvas",
+                  command=self._grow_gauges_to_fill, **_sbtn
+                  ).pack(side="right", padx=2, pady=4)
+        tk.Button(strip, text="Clear canvas",
+                  command=self._clear_gauge_canvas, **_sbtn
+                  ).pack(side="right", padx=2, pady=4)
+        self._canvas_edit_buttons = [
+            w for w in strip.winfo_children()
+            if isinstance(w, tk.Button)
+            and w.cget("text") in {"+ Add gauge", "Load profile…", "Reset layout", "Fit to canvas", "Clear canvas"}
+        ]
+
         tk.Frame(gauge_outer, bg=BORDER, height=1).pack(fill="x")
 
-        gauge_area = tk.Frame(gauge_outer, bg=BG)
-        gauge_area.pack(fill="both", expand=True, padx=10, pady=10)
-        gauge_area.columnconfigure(0, weight=1)
-        gauge_area.columnconfigure(1, weight=1)
-        gauge_area.columnconfigure(2, weight=1)
-        gauge_area.rowconfigure(0, weight=1)
+        self._gauge_host = GaugeHost(gauge_outer)
+        self._gauge_host.pack(fill="both", expand=True, padx=0, pady=0)
 
-        # ── Sensor index map ──────────────────────────────────────────────
-        # Build _gauges as a list indexed by SENSORS order so g_idx works.
-        # Widget type per sensor: True = Gauge, False = BarGauge
-        #  0 RPM, 1 Bat, 2 LP, 3 HP, 4 Clt, 5 OilP, 6 OilT, 7 Bst, 8 Thr, 9 Ivac, 10 Vtec
-        USE_BAR     = {2, 3, 9}    # LP Fuel, HP Rail, Intake → BarGauge
-        USE_DIGITAL = {8, 10}      # Throttle Angle, Valvetronic → DigitalGauge
+        self._rebuild_poll_queue()
 
-        self._gauges = [None] * len(SENSORS)
+        self._gauges = {}  # sensor_id -> gauge widget (or None)
+        self._apply_profile(self._default_layout_profile())
+        self._set_canvas_editing_enabled(True)
 
-        def make_widget(parent, idx, gauge_size=200):
-            lbl, did, ecu, sz, scale_fn, unit, lo, hi, warn, danger, dec = SENSORS[idx]
-            if idx in USE_BAR:
-                w = BarGauge(parent, lbl, unit, lo, hi, warn, danger, dec)
-            elif idx in USE_DIGITAL:
-                w = DigitalGauge(parent, lbl, unit, lo, hi, warn, danger, dec, size=gauge_size)
-            else:
-                w = Gauge(parent, lbl, unit, lo, hi, warn, danger, dec, size=gauge_size)
-            self._gauges[idx] = w
-            self._poll_queue.append((ecu, did, sz, scale_fn, idx))
-
-            def _make_toggle(g_idx, widget):
-                def _toggle():
-                    if self._replay_state != "idle":
-                        self._evt("Cannot toggle sensors during replay", "warn")
-                        return
-                    if self._logging:
-                        self._evt("Cannot toggle sensors while logging", "warn")
-                        return
-                    if g_idx in self._disabled_gauges:
-                        self._disabled_gauges.discard(g_idx)
-                        widget.set_active(True)
-                        widget.set_stale()
-                        self._evt(f"{SENSORS[g_idx][0]}: enabled", "ok")
-                    else:
-                        self._disabled_gauges.add(g_idx)
-                        widget.set_active(False)
-                        self._evt(f"{SENSORS[g_idx][0]}: disabled", "warn")
-                    self._update_sensor_row_style(g_idx)
-                return _toggle
-
-            w.set_active(True, on_toggle=_make_toggle(idx, w))
-            return w
-
-        # ── LEFT: ENGINE ─────────────────────────────────────────────────
-        left_box = GroupBox(gauge_area, "ENGINE")
-        left_box.grid(row=0, column=0, sticky="nsew", padx=(0, 6), pady=0)
-        for idx in [0, 1, 8]:   # RPM, Battery, Throttle
-            make_widget(left_box.inner, idx, gauge_size=195).pack(pady=6, fill="both", expand=True)
-
-        # ── MIDDLE: PRESSURES ────────────────────────────────────────────
-        mid_box = GroupBox(gauge_area, "PRESSURES")
-        mid_box.grid(row=0, column=1, sticky="nsew", padx=6, pady=0)
-
-        # Top two: circular gauges stacked vertically
-        make_widget(mid_box.inner, 5, gauge_size=195).pack(pady=(4, 2), fill="both", expand=True)   # Oil Pressure
-        make_widget(mid_box.inner, 7, gauge_size=195).pack(pady=(2, 2), fill="both", expand=True)   # Boost
-
-        # Bottom: three bar gauges stacked
-        for idx in [2, 3, 9]:   # LP Fuel, HP Rail, Intake
-            make_widget(mid_box.inner, idx).pack(pady=4, padx=6, fill="x")
-
-        # ── RIGHT: TEMPERATURES ──────────────────────────────────────────
-        right_box = GroupBox(gauge_area, "TEMPERATURES")
-        right_box.grid(row=0, column=2, sticky="nsew", padx=(6, 0), pady=0)
-        for idx in [6, 4, 10]:   # Oil Temp, Coolant, Valvetronic
-            make_widget(right_box.inner, idx, gauge_size=195).pack(pady=6, fill="both", expand=True)
-
-        # ── Replay timeline bar (hidden until a log is loaded) ──
+        # ── Replay timeline bar ──
         self._timeline = tk.Frame(self, bg=STRIP_BG, height=38)
         self._timeline.pack_propagate(False)
-        # NOT packed yet — _replay_load() will show it
 
         tl_btn_kw = dict(bg=BTN_BG, activebackground=BTN_ACTIVE_BG,
                          activeforeground=TEXT, font=("Segoe UI", 10),
@@ -489,6 +463,59 @@ class Dashboard(tk.Tk):
         tk.Label(sb, textvariable=self._poll_status, bg=PANEL, fg=DIM,
                  font=("Courier New", 7)).pack(side="right", padx=12)
 
+    # ── Sensor list UI ──
+    def _rebuild_sensor_list_ui(self):
+        for child in self._sensor_inner.winfo_children():
+            child.destroy()
+        self._sensor_list_rows = {}
+        mw = self._sensor_mousewheel
+        sensors = get_sensors()
+        for s in sensors:
+            sid = s["sensor_id"]
+            r = tk.Frame(self._sensor_inner, bg=PANEL, cursor="hand2")
+            r.pack(fill="x", padx=12, pady=1)
+            r.bind("<MouseWheel>", mw)
+            l1 = tk.Label(r, text=f"0x{s['did']:04X}", bg=PANEL, fg=DIM,
+                         font=("Courier New", 8), width=6, anchor="w", cursor="hand2")
+            l1.pack(side="left")
+            l1.bind("<MouseWheel>", mw)
+            l2 = tk.Label(r, text=s["label"], bg=PANEL, fg=LABEL_C,
+                          font=SMALL_FONT, anchor="w", cursor="hand2")
+            l2.pack(side="left", padx=4)
+            l2.bind("<MouseWheel>", mw)
+            def _make_click(sensor_id):
+                def _on_click(_event=None):
+                    self._toggle_sensor_by_id(sensor_id)
+                return _on_click
+            _row_click = _make_click(sid)
+            r.bind("<Button-1>", _row_click)
+            l1.bind("<Button-1>", _row_click)
+            l2.bind("<Button-1>", _row_click)
+            # Right-click context menu
+            def _make_rclick(sensor_id):
+                def _on_rclick(event):
+                    menu = tk.Menu(self, tearoff=False)
+                    menu.add_command(label="Edit Sensor…",
+                                    command=lambda: self._edit_sensor(sensor_id))
+                    menu.add_command(label="Delete Sensor",
+                                    command=lambda: self._delete_sensor(sensor_id))
+                    menu.tk_popup(event.x_root, event.y_root)
+                return _on_rclick
+            _rclick = _make_rclick(sid)
+            r.bind("<Button-3>", _rclick)
+            l1.bind("<Button-3>", _rclick)
+            l2.bind("<Button-3>", _rclick)
+            self._sensor_list_rows[sid] = (r, l1, l2)
+            self._update_sensor_row_style(sid)
+
+    def _rebuild_poll_queue(self):
+        self._poll_queue = []
+        for s in get_sensors():
+            sid = s["sensor_id"]
+            idx = index_of(sid)
+            scale_fn = SENSORS[idx][4]
+            self._poll_queue.append((s["ecu"], s["did"], s["size"], scale_fn, sid))
+
     # ── Focus management ──
     def _on_global_click(self, event):
         if not isinstance(event.widget, (tk.Entry, tk.Text)):
@@ -513,7 +540,7 @@ class Dashboard(tk.Tk):
                  highlightthickness=1, highlightcolor=ACCENT,
                  highlightbackground=BORDER).pack(fill="x", padx=16, pady=(2, 8), ipady=4)
 
-    # ── Live-control enable / disable (mutual exclusion with replay) ──
+    # ── Live-control enable / disable ──
     def _set_live_controls_enabled(self, enabled: bool):
         if enabled:
             self._cbtn.configure(state="normal", bg=ACCENT, fg=WHITE)
@@ -538,34 +565,36 @@ class Dashboard(tk.Tk):
         self._log.insert("end", f"[{ts}] {msg}\n", tag)
         self._log.see("end")
 
-    def _toggle_sensor_by_index(self, g_idx: int):
-        """Toggle sensor gauge and polling from sensor list row click."""
+    def _toggle_sensor_by_id(self, sensor_id: str):
         if self._replay_state != "idle":
             self._evt("Cannot toggle sensors during replay", "warn")
             return
         if self._logging:
             self._evt("Cannot toggle sensors while logging", "warn")
             return
-        if g_idx < 0 or g_idx >= len(self._gauges) or self._gauges[g_idx] is None:
+        s = get_sensor_by_id(sensor_id)
+        if s is None:
             return
-        w = self._gauges[g_idx]
-        if g_idx in self._disabled_gauges:
-            self._disabled_gauges.discard(g_idx)
-            w.set_active(True)
-            w.set_stale()
-            self._evt(f"{SENSORS[g_idx][0]}: enabled", "ok")
+        w = self._gauges.get(sensor_id)
+        if sensor_id in self._disabled_gauges:
+            self._disabled_gauges.discard(sensor_id)
+            if w is not None:
+                w.set_active(True)
+                w.set_stale()
+            self._evt(f"{s['label']}: enabled", "ok")
         else:
-            self._disabled_gauges.add(g_idx)
-            w.set_active(False)
-            self._evt(f"{SENSORS[g_idx][0]}: disabled", "warn")
-        self._update_sensor_row_style(g_idx)
+            self._disabled_gauges.add(sensor_id)
+            if w is not None:
+                w.set_active(False)
+            self._evt(f"{s['label']}: disabled", "warn")
+        self._update_sensor_row_style(sensor_id)
 
-    def _update_sensor_row_style(self, g_idx: int):
-        """Update sensor list row appearance to match enabled/disabled state."""
-        if g_idx >= len(getattr(self, "_sensor_list_rows", [])):
+    def _update_sensor_row_style(self, sensor_id: str):
+        row = self._sensor_list_rows.get(sensor_id)
+        if not row:
             return
-        r, l1, l2 = self._sensor_list_rows[g_idx]
-        if g_idx in self._disabled_gauges:
+        r, l1, l2 = row
+        if sensor_id in self._disabled_gauges:
             r.configure(bg=DISABLED_ROW_BG)
             l1.configure(bg=DISABLED_ROW_BG, fg=DISABLED_ROW_FG)
             l2.configure(bg=DISABLED_ROW_BG, fg=DISABLED_ROW_FG)
@@ -573,6 +602,281 @@ class Dashboard(tk.Tk):
             r.configure(bg=PANEL)
             l1.configure(bg=PANEL, fg=DIM)
             l2.configure(bg=PANEL, fg=LABEL_C)
+
+    # ── Sensor CRUD ──
+    def _add_sensor_dialog(self):
+        if self._logging:
+            self._evt("Cannot add sensors while logging", "warn")
+            return
+        dialog = SensorEditorDialog(self)
+        self.wait_window(dialog)
+        if dialog.result:
+            ok, msg = add_sensor(dialog.result)
+            if ok:
+                self._rebuild_poll_queue()
+                self._rebuild_sensor_list_ui()
+                self._evt(f"Added sensor: {dialog.result['label']}", "ok")
+            else:
+                self._evt(f"Add failed: {msg}", "err")
+
+    def _edit_sensor_dialog(self):
+        """Open a picker, then edit the selected sensor."""
+        if self._logging:
+            self._evt("Cannot edit sensors while logging", "warn")
+            return
+        sensors = get_sensors()
+        if not sensors:
+            self._evt("No sensors to edit", "warn")
+            return
+        self._pick_and_act_sensor("Edit Sensor", self._edit_sensor)
+
+    def _delete_sensor_dialog(self):
+        if self._logging:
+            self._evt("Cannot delete sensors while logging", "warn")
+            return
+        sensors = get_sensors()
+        if not sensors:
+            self._evt("No sensors to delete", "warn")
+            return
+        self._pick_and_act_sensor("Delete Sensor", self._delete_sensor)
+
+    def _pick_and_act_sensor(self, title, callback):
+        """Open a simple list dialog to pick a sensor, then invoke *callback*."""
+        win = tk.Toplevel(self)
+        win.title(title)
+        win.configure(bg=BG)
+        win.resizable(False, False)
+        win.transient(self)
+        win.grab_set()
+        w, h = 300, 340
+        px = self.winfo_rootx() + (self.winfo_width() - w) // 2
+        py = self.winfo_rooty() + (self.winfo_height() - h) // 2
+        win.geometry(f"{w}x{h}+{px}+{py}")
+        sensors = get_sensors()
+        lb = tk.Listbox(win, bg=ENTRY_BG, fg=TEXT, font=("Segoe UI", 9),
+                        selectbackground=ACCENT, selectforeground=WHITE,
+                        selectmode="browse", bd=0, highlightthickness=0,
+                        relief="flat", activestyle="none")
+        lb.pack(fill="both", expand=True, padx=12, pady=(12, 6))
+        for s in sensors:
+            lb.insert("end", f"  {s['label']}")
+        if sensors:
+            lb.selection_set(0)
+        btn_row = tk.Frame(win, bg=BG)
+        btn_row.pack(fill="x", padx=12, pady=(4, 12))
+        def _ok():
+            sel = lb.curselection()
+            if not sel:
+                return
+            sid = sensors[sel[0]]["sensor_id"]
+            win.destroy()
+            callback(sid)
+        tk.Button(btn_row, text="Cancel", bg=BTN_BG, fg=DIM,
+                  activebackground=BTN_ACTIVE_BG, activeforeground=TEXT,
+                  font=("Segoe UI", 9), bd=0, cursor="hand2",
+                  command=win.destroy).pack(side="right", ipadx=12, ipady=3)
+        tk.Button(btn_row, text="OK", bg=ACCENT, fg=WHITE,
+                  activebackground=ACCENT_ACTIVE, activeforeground=WHITE,
+                  font=("Segoe UI", 9, "bold"), bd=0, cursor="hand2",
+                  command=_ok).pack(side="right", padx=(0, 6), ipadx=16, ipady=3)
+        win.protocol("WM_DELETE_WINDOW", win.destroy)
+        win.bind("<Return>", lambda _e: _ok())
+        win.bind("<Escape>", lambda _e: win.destroy())
+
+    def _edit_sensor(self, sensor_id):
+        s = get_sensor_by_id(sensor_id)
+        if s is None:
+            return
+        dialog = SensorEditorDialog(self, sensor_data=s)
+        self.wait_window(dialog)
+        if dialog.result:
+            ok, msg = update_sensor(sensor_id, dialog.result)
+            if ok:
+                self._rebuild_poll_queue()
+                self._rebuild_sensor_list_ui()
+                # Recreate gauge if placed
+                if sensor_id in self._gauges and self._gauges[sensor_id] is not None:
+                    tile = self._gauge_host._tiles.get(sensor_id)
+                    if tile:
+                        bounds = tile.get_bounds()
+                        kind = tile.kind
+                        self._gauge_host.remove_tile(sensor_id)
+                        new_tile = self._gauge_host.add_tile(
+                            sensor_id, kind, *bounds,
+                            on_delete=lambda si=sensor_id: self._on_gauge_delete(si),
+                        )
+                        self._gauges[sensor_id] = new_tile.gauge
+                        self._wire_gauge_toggle(sensor_id, new_tile.gauge)
+                self._evt(f"Updated sensor: {s['label']}", "ok")
+            else:
+                self._evt(f"Update failed: {msg}", "err")
+
+    def _delete_sensor(self, sensor_id):
+        s = get_sensor_by_id(sensor_id)
+        if s is None:
+            return
+        if not messagebox.askyesno("Delete Sensor",
+                                   f"Delete sensor '{s['label']}'?",
+                                   parent=self):
+            return
+        if sensor_id in self._gauges:
+            self._gauges.pop(sensor_id, None)
+            self._gauge_host.remove_tile(sensor_id)
+        self._disabled_gauges.discard(sensor_id)
+        ok, msg = delete_sensor(sensor_id)
+        if ok:
+            self._rebuild_poll_queue()
+            self._rebuild_sensor_list_ui()
+            self._evt(f"Deleted sensor: {s['label']}", "ok")
+        else:
+            self._evt(f"Delete failed: {msg}", "err")
+
+    # ── Gauge profile / canvas management ──
+    def _apply_profile(self, profile):
+        self._gauge_host.clear()
+        self._gauges = {}
+        for entry in profile["gauges"]:
+            sid = entry["sensor_id"]
+            if get_sensor_by_id(sid) is None:
+                continue
+            tile = self._gauge_host.add_tile(
+                sid, entry["kind"],
+                entry["relx"], entry["rely"],
+                entry["relwidth"], entry["relheight"],
+                on_delete=lambda si=sid: self._on_gauge_delete(si),
+            )
+            self._gauges[sid] = tile.gauge
+            self._wire_gauge_toggle(sid, tile.gauge)
+            if sid in self._disabled_gauges:
+                tile.gauge.set_active(False)
+        self.after_idle(self._gauge_host.fit_grid_layout)
+
+    def _default_layout_profile(self):
+        default_path = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "default.json")
+        )
+        profile = load_profile(default_path)
+        return profile if profile is not None else DEFAULT_GAUGE_PROFILE
+
+    def _set_canvas_editing_enabled(self, enabled: bool):
+        self._gauge_host.set_editing_enabled(enabled)
+        state = "normal" if enabled else "disabled"
+        for b in getattr(self, "_canvas_edit_buttons", []):
+            b.configure(state=state)
+
+    def _wire_gauge_toggle(self, sensor_id, widget):
+        s = get_sensor_by_id(sensor_id)
+        label = s["label"] if s else sensor_id
+        def _toggle():
+            if self._replay_state != "idle":
+                self._evt("Cannot toggle sensors during replay", "warn")
+                return
+            if self._logging:
+                self._evt("Cannot toggle sensors while logging", "warn")
+                return
+            if sensor_id in self._disabled_gauges:
+                self._disabled_gauges.discard(sensor_id)
+                widget.set_active(True)
+                widget.set_stale()
+                self._evt(f"{label}: enabled", "ok")
+            else:
+                self._disabled_gauges.add(sensor_id)
+                widget.set_active(False)
+                self._evt(f"{label}: disabled", "warn")
+            self._update_sensor_row_style(sensor_id)
+        widget.set_active(True, on_toggle=_toggle)
+
+    def _on_gauge_delete(self, sensor_id):
+        self._gauges.pop(sensor_id, None)
+        self._gauge_host.remove_tile(sensor_id)
+        s = get_sensor_by_id(sensor_id)
+        self._evt(f"Removed {s['label'] if s else sensor_id} gauge", "warn")
+
+    def _add_gauge_dialog(self):
+        if self._replay_state != "idle":
+            self._evt("Cannot edit gauge canvas during replay", "warn")
+            return
+        placed = self._gauge_host.placed_sensor_ids()
+        dialog = GaugeEditorDialog(self, placed_ids=placed)
+        self.wait_window(dialog)
+        if dialog.result:
+            sid, kind = dialog.result
+            rx, ry, rw, rh = self._gauge_host.suggest_new_tile_rect(sid, kind)
+            tile = self._gauge_host.add_tile(
+                sid, kind, rx, ry, rw, rh,
+                on_delete=lambda si=sid: self._on_gauge_delete(si),
+            )
+            self._gauges[sid] = tile.gauge
+            self._wire_gauge_toggle(sid, tile.gauge)
+            if sid in self._disabled_gauges:
+                tile.gauge.set_active(False)
+            s = get_sensor_by_id(sid)
+            self._evt(f"Added {s['label'] if s else sid} ({kind})", "ok")
+
+    def _save_gauge_profile(self):
+        from tkinter import filedialog
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("Gauge profile", "*.json")],
+            title="Save gauge profile",
+        )
+        if not path:
+            return
+        profile = self._gauge_host.get_profile()
+        save_profile(profile, path)
+        self._evt(f"Profile saved \u2192 {os.path.basename(path)}", "ok")
+
+    def _open_gauge_profile(self):
+        if self._replay_state != "idle":
+            self._evt("Cannot edit gauge canvas during replay", "warn")
+            return
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(
+            filetypes=[("Gauge profile", "*.json")],
+            title="Load gauge profile",
+        )
+        if not path:
+            return
+        profile = load_profile(path)
+        if profile is None:
+            self._evt("Invalid or unreadable profile file", "err")
+            return
+        self._apply_profile(profile)
+        self._evt(f"Profile loaded \u2190 {os.path.basename(path)}", "ok")
+
+    def _reset_gauge_profile(self):
+        if self._replay_state != "idle":
+            self._evt("Cannot edit gauge canvas during replay", "warn")
+            return
+        self._apply_profile(self._default_layout_profile())
+        self._evt("Layout reset to default", "ok")
+
+    def _grow_gauges_to_fill(self):
+        if self._replay_state != "idle":
+            self._evt("Cannot edit gauge canvas during replay", "warn")
+            return
+        changed = self._gauge_host.grow_tiles_to_fill_space()
+        if changed > 0:
+            self._evt("Fit to canvas applied", "ok")
+        else:
+            self._evt("Fit to canvas: cluster already fills available space", "info")
+
+    def _clear_gauge_canvas(self):
+        if self._replay_state != "idle":
+            self._evt("Cannot edit gauge canvas during replay", "warn")
+            return
+        if not self._gauge_host.placed_sensor_ids():
+            self._evt("Gauge canvas is already empty", "info")
+            return
+        if not messagebox.askyesno(
+            "Clear gauge canvas",
+            "Remove all gauges from the canvas?",
+            parent=self,
+        ):
+            return
+        self._gauge_host.clear()
+        self._gauges = {}
+        self._evt("Gauge canvas cleared", "ok")
 
     # ── Auto-discover ──
     def _discover_car(self):
@@ -589,21 +893,14 @@ class Dashboard(tk.Tk):
             port = int(self._port_var.get().strip())
         except ValueError:
             pass
-
         found = None
-
-        # Phase 1: common BMW gateway IPs (fast — ~200 ms worst-case)
         for ip in ["169.254.9.103", "169.254.9.104", "169.254.9.105",
                     "169.254.9.100", "169.254.9.1"]:
             if self._probe_port(ip, port):
                 found = ip
                 break
-
-        # Phase 2: full /24 of the common BMW subnet
         if not found:
             found = self._scan_subnet("169.254.9", port)
-
-        # Phase 3: scan /24 of every local link-local interface
         if not found:
             for prefix in self._find_link_local_subnets():
                 if prefix == "169.254.9":
@@ -611,7 +908,6 @@ class Dashboard(tk.Tk):
                 found = self._scan_subnet(prefix, port)
                 if found:
                     break
-
         self._pkt_queue.put(("discover_result", found))
 
     def _probe_port(self, ip, port, timeout=0.15):
@@ -629,12 +925,10 @@ class Dashboard(tk.Tk):
     def _scan_subnet(self, prefix, port):
         from concurrent.futures import ThreadPoolExecutor, as_completed
         hit = [None]
-
         def probe(ip):
             if hit[0] is not None:
                 return False
             return self._probe_port(ip, port)
-
         pool = ThreadPoolExecutor(max_workers=32)
         futures = {pool.submit(probe, f"{prefix}.{i}"): f"{prefix}.{i}"
                    for i in range(1, 255)}
@@ -679,13 +973,9 @@ class Dashboard(tk.Tk):
             s.connect((ip, port)); s.settimeout(None)
         except Exception as e:
             self._pkt_queue.put(("err", str(e))); return
-
         self._sock = s; self._running = True
         self._pkt_queue.put(("connected", (ip, port)))
-
-        # Read VIN immediately
         self._do_send(0x10, bytes([0x22, 0xF1, 0x90]))
-
         self._rx_buf = b""
         while self._running:
             try:
@@ -694,7 +984,6 @@ class Dashboard(tk.Tk):
                 self._rx_buf += chunk
                 self._parse_rx()
             except Exception: break
-
         self._pkt_queue.put(("disconnected", None))
         try: s.close()
         except Exception: pass
@@ -705,64 +994,39 @@ class Dashboard(tk.Tk):
             if res is None: break
             src, dst, uds, consumed, msg_type = res
             self._rx_buf = self._rx_buf[consumed:]
-
-            # 0x0002 = gateway echo — no real data
             if msg_type == 0x0002:
                 continue
-
-            # 0x0043 = HSFZ gateway status/reinit frame — ECU may have reset
             if msg_type == 0x0043:
                 self._pkt_queue.put(("ecu_reset", None))
                 continue
-
             if msg_type != 0x0001:
                 continue
-
-            # NRC 0x7F — ECU rejected our request
             if uds and len(uds) >= 1 and uds[0] == 0x7F:
                 self._pkt_queue.put(("nrc", uds))
                 continue
-
-            # 0x6C 0x01 = Define ACK — send Read immediately on the RX thread, no queue
             if (uds and len(uds) >= 4
-                    and uds[0] == 0x6C
-                    and uds[1] == 0x01
-                    and uds[2] == DYN_H
-                    and uds[3] == DYN_L):
+                    and uds[0] == 0x6C and uds[1] == 0x01
+                    and uds[2] == DYN_H and uds[3] == DYN_L):
                 snapshot = self._poll_pending
                 if snapshot:
                     _, _, _, _, gen, ecu = snapshot
                     if gen == self._poll_gen and self._polling and self._running:
                         self._do_send(ecu, bytes([0x22, DYN_H, DYN_L]))
                 continue
-
-            # 0x6C 0x03 = Clear ACK — start next poll immediately on the RX thread
             if (uds and len(uds) >= 4
-                    and uds[0] == 0x6C
-                    and uds[1] == 0x03
-                    and uds[2] == DYN_H
-                    and uds[3] == DYN_L):
+                    and uds[0] == 0x6C and uds[1] == 0x03
+                    and uds[2] == DYN_H and uds[3] == DYN_L):
                 if self._polling and self._running:
                     self._poll_next()
                 continue
-
-            # Sensor value response (0x62 + DID F300)
             if (uds and len(uds) >= 3
-                    and uds[0] == 0x62
-                    and uds[1] == DYN_H
-                    and uds[2] == DYN_L):
-                # Snapshot now; tuple includes generation so drain_queue can
-                # reject responses that arrive after a stall timeout advanced us.
+                    and uds[0] == 0x62 and uds[1] == DYN_H and uds[2] == DYN_L):
                 snapshot = self._poll_pending
                 self._poll_pending = None
                 if snapshot:
                     self._pkt_queue.put(("sensor", uds[3:], snapshot))
-
-            # VIN response (0x62 + F190)
             elif (uds and len(uds) >= 3
-                  and uds[0] == 0x62
-                  and uds[1] == 0xF1
-                  and uds[2] == 0x90):
+                  and uds[0] == 0x62 and uds[1] == 0xF1 and uds[2] == 0x90):
                 try:
                     vin = uds[3:].decode("ascii").strip()
                 except Exception:
@@ -786,7 +1050,7 @@ class Dashboard(tk.Tk):
             self._sock = None
 
     _polling     = False
-    _poll_timeout_id = None   # after() handle so we can cancel it
+    _poll_timeout_id = None
 
     def _toggle_polling(self):
         if self._polling:
@@ -811,27 +1075,19 @@ class Dashboard(tk.Tk):
             self._poll_next()
 
     def _poll_next(self):
-        """Step 1: Send Define. Read is sent only after ECU confirms with 0x6C."""
         if not self._polling or not self._running: return
         if not self._poll_queue: return
-
-        # Skip any sensors the user has disabled; bail if all are disabled
         active_queue = [e for e in self._poll_queue if e[4] not in self._disabled_gauges]
         if not active_queue:
             return
-
-        ecu, did, sz, scale_fn, g_idx = active_queue[self._poll_idx % len(active_queue)]
+        ecu, did, sz, scale_fn, sensor_id = active_queue[self._poll_idx % len(active_queue)]
         self._poll_idx += 1
-
         self._poll_gen += 1
         gen = self._poll_gen
         dh = (did >> 8) & 0xFF
         dl = did & 0xFF
-        self._poll_pending = (did, sz, scale_fn, g_idx, gen, ecu)
-
-        # Step 1: Define — Read is sent when 0x6C response arrives in _parse_rx
+        self._poll_pending = (did, sz, scale_fn, sensor_id, gen, ecu)
         self._do_send(ecu, bytes([0x2C, 0x01, DYN_H, DYN_L, dh, dl, 0x01, sz]))
-
         if self._poll_timeout_id:
             self.after_cancel(self._poll_timeout_id)
         self._poll_timeout_id = self.after(500, self._poll_stall_timeout, gen)
@@ -839,23 +1095,17 @@ class Dashboard(tk.Tk):
     _stall_count = 0
 
     def _poll_stall_timeout(self, gen: int):
-        """ECU didn't respond within 500 ms — tear down the TCP connection and
-        reconnect from scratch. The _worker thread will re-do the full 3-way
-        handshake and re-read the VIN; polling resumes on 'connected'."""
         if gen != self._poll_gen:
-            return  # response arrived in time, timer just hadn't been cancelled yet
+            return
         self._poll_pending    = None
         self._poll_timeout_id = None
         self._stall_count     = 0
         self._evt("ECU stall — reconnecting…", "warn")
-
         ip   = self._ip_var.get().strip()
         port = self._port_var.get().strip()
         try: port = int(port)
         except ValueError: return
-
-        self._stall_reconnecting = True   # tell "disconnected" handler to stay quiet
-
+        self._stall_reconnecting = True
         def _do_reconnect():
             if self._sock:
                 try: self._sock.shutdown(socket.SHUT_RDWR)
@@ -864,12 +1114,11 @@ class Dashboard(tk.Tk):
                 except Exception: pass
             time.sleep(0.15)
             threading.Thread(target=self._worker, args=(ip, port), daemon=True).start()
-
         threading.Thread(target=_do_reconnect, daemon=True).start()
 
     # ── Polling watchdog ──
-    WATCHDOG_INTERVAL = 1000   # ms between checks
-    WATCHDOG_TIMEOUT  = 1.5    # seconds with no sensor update before restart
+    WATCHDOG_INTERVAL = 1000
+    WATCHDOG_TIMEOUT  = 1.5
 
     def _start_watchdog(self):
         self._stop_watchdog()
@@ -911,29 +1160,28 @@ class Dashboard(tk.Tk):
         self._start_watchdog()
         self._poll_next()
 
-    # ── CSV Logging ──
+    # ── JSON Logging ──
     def _toggle_logging(self):
         if self._logging: self._log_stop()
         else:             self._log_start()
 
     def _log_start(self):
         ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"bmw_log_{ts}.csv"
-        # Always write next to the exe/script, regardless of working directory
-        if getattr(sys, 'frozen', False):
-            script_dir = os.path.dirname(sys.executable)
-        else:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-        self._log_path  = os.path.join(script_dir, filename)
+        filename = f"bmw_log_{ts}.jsonl"
+        self._log_path  = os.path.join(application_base_dir(), filename)
         try:
-            self._log_file   = open(self._log_path, "w", newline="")
-            self._log_writer = csv.writer(self._log_file)
-            # Header row — auto-built from SENSORS so new sensors appear automatically
-            headers = ["datetime"] + [f"{lbl} ({unit})"
-                                       for lbl, *_, unit, lo, hi, warn, danger, dec
-                                       in [(s[0], s[5], s[6], s[7], s[8], s[9], s[10])
-                                           for s in SENSORS]]
-            self._log_writer.writerow(headers)
+            self._log_file = open(self._log_path, "w", encoding="utf-8")
+            # Write header line
+            sensors = get_sensors()
+            header = {
+                "type": "header",
+                "version": 2,
+                "sensors": [
+                    {"sensor_id": s["sensor_id"], "label": s["label"], "unit": s["unit"]}
+                    for s in sensors
+                ],
+            }
+            self._log_file.write(_json.dumps(header, ensure_ascii=False) + "\n")
             self._log_file.flush()
             self._logging = True
             self._log_latest.clear()
@@ -951,21 +1199,18 @@ class Dashboard(tk.Tk):
                 self._log_file.flush()
                 self._log_file.close()
             except Exception: pass
-            self._log_file   = None
-            self._log_writer = None
+            self._log_file = None
         self._log_btn.configure(text="⏺  START LOGGING", bg=BTN_BG, fg=DIM)
         self._log_name_var.set("no log active")
         self._evt("Logging stopped", "warn")
 
-    def _log_write(self, g_idx: int, phys: float):
-        """Write a CSV row on every sensor update using the latest known values."""
-        if not self._logging or not self._log_writer: return
-        self._log_latest[g_idx] = phys
+    def _log_write(self, sensor_id: str, phys: float):
+        if not self._logging or not self._log_file: return
+        self._log_latest[sensor_id] = phys
         ts  = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-        row = [ts] + [f"{self._log_latest.get(i, ''):.{SENSORS[i][10]}f}" if i in self._log_latest else ""
-                      for i in range(len(SENSORS))]
+        entry = {"ts": ts, "d": dict(self._log_latest)}
         try:
-            self._log_writer.writerow(row)
+            self._log_file.write(_json.dumps(entry, ensure_ascii=False) + "\n")
             self._log_row_count += 1
             if self._log_row_count % 50 == 0:
                 self._log_file.flush()
@@ -978,14 +1223,12 @@ class Dashboard(tk.Tk):
         from tkinter import filedialog
         if self._log_path and os.path.isfile(self._log_path):
             start_dir = os.path.dirname(self._log_path)
-        elif getattr(sys, 'frozen', False):
-            start_dir = os.path.dirname(sys.executable)
         else:
-            start_dir = os.path.dirname(os.path.abspath(__file__))
+            start_dir = application_base_dir()
         path = filedialog.askopenfilename(
-            title="Select BMW Log CSV",
+            title="Select BMW Log",
             initialdir=start_dir,
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            filetypes=[("Log files", "*.jsonl *.csv"), ("All files", "*.*")],
         )
         if not path:
             return
@@ -1004,14 +1247,12 @@ class Dashboard(tk.Tk):
         from tkinter import filedialog
         if self._log_path and os.path.isfile(self._log_path):
             start_dir = os.path.dirname(self._log_path)
-        elif getattr(sys, 'frozen', False):
-            start_dir = os.path.dirname(sys.executable)
         else:
-            start_dir = os.path.dirname(os.path.abspath(__file__))
+            start_dir = application_base_dir()
         path = filedialog.askopenfilename(
-            title="Select BMW Log CSV for Replay",
+            title="Select BMW Log for Replay",
             initialdir=start_dir,
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            filetypes=[("Log files", "*.jsonl *.csv"), ("All files", "*.*")],
         )
         if not path:
             return
@@ -1037,14 +1278,7 @@ class Dashboard(tk.Tk):
                 if raw is None:
                     with open(path, "r", errors="replace") as f:
                         raw = f.read()
-                reader = csv.reader(raw.splitlines())
-                next(reader, None)
-                rows = [r for r in reader if any(c.strip() for c in r)]
-                if rows:
-                    t0 = Dashboard._parse_replay_ts_static(
-                        rows[0][0] if rows[0] else "")
-                    tN = Dashboard._parse_replay_ts_static(
-                        rows[-1][0] if rows[-1] else "")
+                rows, t0, tN = self._parse_log_file(raw, path)
             except Exception as e:
                 err = str(e)
             self.after(
@@ -1055,6 +1289,94 @@ class Dashboard(tk.Tk):
             )
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _parse_log_file(self, raw_text, path):
+        """Parse a log file (JSONL or CSV) into replay rows.
+
+        Returns ``(rows, t0, tN)`` where each row is ``(ts_str, {sensor_id: phys})``.
+        """
+        lines = raw_text.splitlines()
+        if not lines:
+            return [], None, None
+
+        # Detect JSON vs CSV by trying to parse the first non-empty line
+        first = ""
+        for line in lines:
+            if line.strip():
+                first = line.strip()
+                break
+
+        if first.startswith("{"):
+            return self._parse_jsonl_log(lines)
+        return self._parse_csv_log(raw_text)
+
+    def _parse_jsonl_log(self, lines):
+        """Parse JSONL log format."""
+        rows = []
+        sensor_map = {}  # populated from header
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = _json.loads(line)
+            except Exception:
+                continue
+            if entry.get("type") == "header":
+                for info in entry.get("sensors", []):
+                    sensor_map[info["sensor_id"]] = info
+                continue
+            ts = entry.get("ts", "")
+            readings = entry.get("d", {})
+            if readings:
+                rows.append((ts, {k: float(v) for k, v in readings.items()
+                                  if v is not None}))
+        t0 = Dashboard._parse_replay_ts_static(rows[0][0]) if rows else None
+        tN = Dashboard._parse_replay_ts_static(rows[-1][0]) if rows else None
+        return rows, t0, tN
+
+    def _parse_csv_log(self, raw_text):
+        """Parse legacy CSV log format, mapping columns to sensor_ids."""
+        import csv
+        reader = csv.reader(raw_text.splitlines())
+        header = next(reader, None)
+        if not header:
+            return [], None, None
+
+        # Map CSV columns to sensor_ids by matching header labels
+        col_to_sid = {}
+        sensors = get_sensors()
+        for col_idx, col_name in enumerate(header[1:], start=1):
+            name = col_name.split("(")[0].strip()
+            for s in sensors:
+                if s["label"] == name:
+                    col_to_sid[col_idx] = s["sensor_id"]
+                    break
+            else:
+                # Fallback: try positional index
+                pos = col_idx - 1
+                if 0 <= pos < len(sensors):
+                    col_to_sid[col_idx] = sensors[pos]["sensor_id"]
+
+        rows = []
+        for r in reader:
+            if not any(c.strip() for c in r):
+                continue
+            ts = r[0] if r else ""
+            readings = {}
+            for col_idx, sid in col_to_sid.items():
+                if col_idx < len(r):
+                    val = r[col_idx].strip()
+                    if val:
+                        try:
+                            readings[sid] = float(val)
+                        except (ValueError, TypeError):
+                            pass
+            rows.append((ts, readings))
+
+        t0 = Dashboard._parse_replay_ts_static(rows[0][0]) if rows else None
+        tN = Dashboard._parse_replay_ts_static(rows[-1][0]) if rows else None
+        return rows, t0, tN
 
     @staticmethod
     def _parse_replay_ts_static(ts_str):
@@ -1084,7 +1406,6 @@ class Dashboard(tk.Tk):
         self._replay_t0 = t0
         self._replay_tN = tN
 
-        # If connected, tear everything down first
         if self._running:
             if self._logging:
                 self._log_stop()
@@ -1106,12 +1427,11 @@ class Dashboard(tk.Tk):
         self._evt(f"Loaded {len(self._replay_data)} rows from {name}", "ok")
         self._fvar.set(f"Replay loaded  ·  {len(self._replay_data)} rows  ·  ready")
         self._set_live_controls_enabled(False)
-        # Show timeline bar above the status bar
+        self._set_canvas_editing_enabled(False)
         self._timeline.pack(fill="x", side="bottom", before=self._status_sep)
         self._tl_play_btn.configure(text="▶", fg=SUCCESS)
         self._replay_apply_row(0)
         self._tl_update()
-        # Also open the log viewer with shared replay cursor
         self._replay_shared_idx = multiprocessing.Value('i', 0)
         p = multiprocessing.Process(target=_launch_log_viewer_synced,
                                     args=(path, self._replay_shared_idx), daemon=True)
@@ -1133,11 +1453,12 @@ class Dashboard(tk.Tk):
         self._replay_name_var.set("")
         self._replay_name_lbl.pack_forget()
         self._timeline.pack_forget()
-        for g in self._gauges:
+        for g in self._gauges.values():
             if g is not None:
                 g.set_stale()
         self._poll_status.set("")
         self._set_live_controls_enabled(True)
+        self._set_canvas_editing_enabled(True)
         self._fvar.set("BMW FXX ENET Dashboard  ·  HSFZ / UDS  ·  Offline")
         self._evt("Replay unloaded", "warn")
 
@@ -1179,8 +1500,8 @@ class Dashboard(tk.Tk):
         delay_ms = 50
         if self._replay_idx + 1 < len(self._replay_data):
             nxt = self._replay_data[self._replay_idx + 1]
-            t_now  = self._parse_replay_ts(row[0] if row else "")
-            t_next = self._parse_replay_ts(nxt[0] if nxt else "")
+            t_now  = self._parse_replay_ts(row[0])
+            t_next = self._parse_replay_ts(nxt[0])
             if t_now and t_next:
                 delta = (t_next - t_now).total_seconds() * 1000
                 delay_ms = max(10, min(int(delta), 2000))
@@ -1196,19 +1517,11 @@ class Dashboard(tk.Tk):
     def _replay_apply_row(self, idx):
         if not self._replay_data or idx < 0 or idx >= len(self._replay_data):
             return
-        row = self._replay_data[idx]
-        for i in range(len(SENSORS)):
-            col = i + 1
-            phys = 0.0
-            if col < len(row):
-                val = row[col].strip()
-                if val:
-                    try:
-                        phys = float(val)
-                    except (ValueError, TypeError):
-                        pass
-            if self._gauges[i] is not None:
-                self._gauges[i].update_value(phys, 0)
+        ts_str, readings = self._replay_data[idx]
+        for sensor_id, phys in readings.items():
+            g = self._gauges.get(sensor_id)
+            if g is not None:
+                g.update_value(phys, 0)
         if hasattr(self, '_replay_shared_idx') and self._replay_shared_idx is not None:
             try:
                 self._replay_shared_idx.value = idx
@@ -1285,8 +1598,8 @@ class Dashboard(tk.Tk):
     def _tl_format_time(self, idx):
         if not self._replay_data or idx < 0 or idx >= len(self._replay_data):
             return "00:00"
-        row = self._replay_data[idx]
-        ts = self._parse_replay_ts(row[0] if row else "")
+        ts_str = self._replay_data[idx][0]
+        ts = self._parse_replay_ts(ts_str)
         if ts and self._replay_t0:
             delta = (ts - self._replay_t0).total_seconds()
             m, s = divmod(max(0, int(delta)), 60)
@@ -1306,7 +1619,6 @@ class Dashboard(tk.Tk):
         total = len(self._replay_data)
         idx = max(0, min(self._replay_idx, total - 1))
         frac = idx / max(1, total - 1) if total > 1 else 0
-
         elapsed = self._tl_format_time(idx)
         duration = self._tl_total_time()
         self._tl_time_var.set(f"{elapsed} / {duration}")
@@ -1320,7 +1632,6 @@ class Dashboard(tk.Tk):
         h = c.winfo_height() or 22
         cy = h // 2
         track_y0, track_y1 = cy - 3, cy + 3
-
         c.create_rectangle(0, track_y0, w, track_y1, fill=BORDER, outline="")
         fill_x = int(frac * w)
         if fill_x > 0:
@@ -1391,7 +1702,6 @@ class Dashboard(tk.Tk):
                     self._fvar.set(f"Connected  {ip}:{port}  ·  HSFZ/UDS active")
                     self._poll_btn.configure(state="normal", fg=TEXT)
                     self._log_btn.configure(state="normal", fg=TEXT)
-                    # If this was a stall-triggered reconnect, resume polling immediately
                     if was_reconnecting and self._polling:
                         self._poll_pending = None
                         self._last_gauge_update = time.monotonic()
@@ -1399,8 +1709,6 @@ class Dashboard(tk.Tk):
 
                 elif kind == "disconnected":
                     if self._stall_reconnecting:
-                        # Mid-reconnect — old worker died as expected, new one is starting.
-                        # Don't clear _polling/_running; just note it in the log.
                         self._evt("Reconnecting…", "warn")
                     else:
                         self._evt("Disconnected", "warn")
@@ -1415,11 +1723,12 @@ class Dashboard(tk.Tk):
                                                 bg=BTN_BG, fg=DIM, state="disabled")
                         self._log_btn.configure(text="⏺  START LOGGING",
                                                bg=BTN_BG, fg=DIM, state="disabled")
-                        for g in self._gauges: g.set_stale()
+                        for g in self._gauges.values():
+                            if g is not None:
+                                g.set_stale()
                         self._vin_var.set("——————————————————")
 
                 elif kind == "ecu_reset":
-                    # HSFZ 0x0043 — gateway signalled a reset. Re-establish session.
                     self._evt("Gateway reset detected — re-establishing session…", "warn")
                     self._pkt_queue.put(("reinit", None))
 
@@ -1428,7 +1737,6 @@ class Dashboard(tk.Tk):
                     nrc_code  = nrc_bytes[2] if len(nrc_bytes) >= 3 else 0
                     svc       = nrc_bytes[1] if len(nrc_bytes) >= 2 else 0
                     self._evt(f"NRC 0x{nrc_code:02X} svc 0x{svc:02X} — skipping", "warn")
-                    # Cancel the stall timeout for this cycle and just move on
                     if self._poll_timeout_id:
                         self.after_cancel(self._poll_timeout_id)
                         self._poll_timeout_id = None
@@ -1442,12 +1750,10 @@ class Dashboard(tk.Tk):
 
                 elif kind == "sensor":
                     value_bytes, snapshot = data, item[2]
-                    did, sz, scale_fn, g_idx, gen, ecu = snapshot
+                    did, sz, scale_fn, sensor_id, gen, ecu = snapshot
                     if gen != self._poll_gen:
                         continue
-                    # Step 3: send Clear immediately after value received
                     self._do_send(ecu, bytes([0x2C, 0x03, DYN_H, DYN_L]))
-                    # Cancel stall timeout — response arrived
                     if self._poll_timeout_id:
                         self.after_cancel(self._poll_timeout_id)
                         self._poll_timeout_id = None
@@ -1465,12 +1771,14 @@ class Dashboard(tk.Tk):
                     raw = int.from_bytes(value_bytes[:sz], "big")
                     try: phys = scale_fn(raw)
                     except Exception: phys = float(raw)
-                    self._gauges[g_idx].update_value(phys, raw)
-                    self._log_write(g_idx, phys)
-                    lbl, *_ = SENSORS[g_idx]
+                    g = self._gauges.get(sensor_id)
+                    if g is not None:
+                        g.update_value(phys, raw)
+                    self._log_write(sensor_id, phys)
+                    s = get_sensor_by_id(sensor_id)
+                    lbl = s["label"] if s else sensor_id
                     self._poll_status.set(
                         f"last: {lbl} = {phys:.2f}  raw={raw}  DID=0x{did:04X}")
-                    # Next poll is triggered by clear_ack (6C 03), not here
 
                 elif kind == "discover_result":
                     self._discovering = False
@@ -1501,4 +1809,3 @@ class Dashboard(tk.Tk):
 def main():
     multiprocessing.freeze_support()
     Dashboard().mainloop()
-
